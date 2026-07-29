@@ -15,6 +15,7 @@ components/TableOfContents.module.css
 components/TableOfContents.tsx
 lib/format.test.ts
 lib/format.ts
+lib/markdown-posts.cases.json
 lib/markdown-posts.test.ts
 lib/markdown-posts.ts
 lib/markdown.test.ts
