@@ -30,5 +30,5 @@ export default async function PostPage({ params }: PageProps<"/posts/[slug]">) {
   const { slug } = await params;
   const post = getPublishedPost(slug);
   if (!post) notFound();
-  return <PostDetail post={post} listLabel={POST_LIST_TITLE} backHref={HOME_PATH} backLabel="記事一覧へ戻る" />;
+  return <PostDetail post={post} listLabel={POST_LIST_TITLE} backHref={HOME_PATH} backLabel={`${POST_LIST_TITLE}へ戻る`} />;
 }
