@@ -1,6 +1,6 @@
 # elys0912.github.io
 
-elys0912 の技術ブログ。https://elys0912.github.io/ で公開している。
+elys0912 のブログ（サイト名は `lib/site.ts` の `SITE_NAME` だけに書く）。https://elys0912.github.io/ で公開している。
 
 - Next.js の静的出力（`output: "export"`）で `out/` に HTML を書き出し、GitHub Pages で配信する
 - 記事は `content/blog/*.md`。ビルドのときに直接読む（データベースや API は使わない）
