@@ -1,0 +1,103 @@
+.header {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+}
+
+/*
+ * PC: 左に赤→黄→緑を 62° の斜めで並べ、右（420px から 640px）と下（30% から）へ黒に溶かす。
+ * mask が効かない環境では 3 色が溶けずに切れるだけで、ナビは黒地の上にあるので読める。
+ */
+.header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    62deg,
+    var(--red) 0 190px,
+    var(--yellow) 190px 392px,
+    var(--green) 392px 560px,
+    transparent 560px
+  );
+  -webkit-mask:
+    linear-gradient(90deg, #000 0 420px, transparent 640px),
+    linear-gradient(180deg, #000 0 30%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask:
+    linear-gradient(90deg, #000 0 420px, transparent 640px),
+    linear-gradient(180deg, #000 0 30%, transparent 100%);
+  mask-composite: intersect;
+}
+
+/* スマホ用の帯。PC では出さない */
+.band {
+  display: none;
+}
+
+.inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 64px;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav a {
+  display: inline-block;
+  padding: 4px 2px;
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+}
+
+.nav a:hover,
+.nav a:focus-visible {
+  border-bottom-color: var(--muted);
+}
+
+/* 現在地は黄の下線 */
+.nav a[aria-current="page"] {
+  border-bottom-color: var(--yellow);
+}
+
+@media (max-width: 640px) {
+  .header::before {
+    display: none;
+  }
+
+  /* 上端に 14px の帯。3 色を幅いっぱいに並べ、右端だけ黒へ溶かす */
+  .band {
+    display: block;
+    height: 14px;
+    background: linear-gradient(
+      62deg,
+      var(--red) 0 30%,
+      var(--yellow) 30% 70%,
+      var(--green) 70% 100%
+    );
+    -webkit-mask: linear-gradient(90deg, #000 0 84%, transparent 100%);
+    mask: linear-gradient(90deg, #000 0 84%, transparent 100%);
+  }
+
+  .inner {
+    justify-content: flex-start;
+    height: 44px;
+  }
+
+  .nav {
+    gap: 4px 16px;
+    font-size: 0.875rem;
+  }
+}

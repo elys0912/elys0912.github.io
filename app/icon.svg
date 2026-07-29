@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 3 つのアクセント色の正方形を扇形で描く -->
+  <rect width="64" height="64" rx="14" fill="#0d1210"/>
+  <clipPath id="mark">
+    <rect x="8" y="8" width="48" height="48" rx="10"/>
+  </clipPath>
+  <g clip-path="url(#mark)">
+    <!-- 0〜50%（上→右→下）: 黄 -->
+    <rect x="32" y="0" width="32" height="64" fill="#ffe100"/>
+    <!-- 50〜90%（下→左→324°）: 緑 -->
+    <path d="M32 32L32 72A40 40 0 0 1 8.49 -0.36Z" fill="#0d9b4e"/>
+    <!-- 90〜100%（324°→上）: 赤 -->
+    <path d="M32 32L8.49 -0.36A40 40 0 0 1 32 -8Z" fill="#e5002b"/>
+  </g>
+</svg>

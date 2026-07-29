@@ -1,0 +1,49 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# ワークフロー全体には読み取りだけを渡す。pages: write と id-token: write は deploy のジョブだけに付ける
+permissions:
+  contents: read
+
+# デプロイは同時に 1 つだけ。実行中のデプロイは止めず、後から来たものを待たせる（GitHub Pages の推奨の設定）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      # main への push で CI（ci.yml）の結果を待たずに動くので、公開しない記事と画像の検査をここでも行う
+      - run: npm run check:drafts
+      - run: npm run check:images
+      # next build を直接呼ぶと後処理（scripts/postbuild.mjs）が走らないので npm run build を使う
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Pages の設定（公開元が GitHub Actions になっていること）を確かめる。Pages の API を読むので、権限のあるこのジョブで動かす
+      - uses: actions/configure-pages@v6
+      - id: deployment
+        uses: actions/deploy-pages@v5
