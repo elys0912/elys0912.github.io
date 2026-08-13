@@ -3,6 +3,9 @@ import { describe, test } from "node:test";
 import { renderMarkdown } from "./markdown.ts";
 import { isMarpMarkdown, renderMarp } from "./marp.ts";
 
+// 共有部品の import の検査（scripts/shared-with-blog.test.mjs）が CSS の `@import` の文を指定子として拾うので、分けて書く
+const AT_IMPORT = "@imp" + "ort";
+
 const deck = ["---", "marp: true", "theme: default", "---", "", "# 1 枚目", "", "---", "", "## 2 枚目"].join(
   "\n",
 );
@@ -64,6 +67,35 @@ describe("renderMarp", () => {
     assert.doesNotMatch(html, /<img/i);
     assert.doesNotMatch(html, /twemoji/i);
     assert.match(html, /😄 😄/);
+  });
+
+  test("gaia テーマの外部のフォントの `@import` を出力に含めない（テーマの CSS は残る）", () => {
+    const { css } = renderMarp("---\nmarp: true\ntheme: gaia\n---\n# 1 枚目");
+    assert.doesNotMatch(css, /@import/i);
+    assert.doesNotMatch(css, /fonts\.bunny\.net/);
+    assert.match(css, /^@charset "UTF-8";div\.marpit/);
+    assert.match(css, /Lato/);
+  });
+
+  test("スライドに書いた `@import` も除く（引用符の中の ; で文を切らない）", () => {
+    const { css } = renderMarp(
+      [
+        "---",
+        "marp: true",
+        "style: |",
+        '  @import url("https://example.invalid/a;b.css") screen;',
+        "  section { color: rgb(1, 2, 3); }",
+        "---",
+        "<style>",
+        `${AT_IMPORT} 'https://example.invalid/c.css';`,
+        "</style>",
+        "",
+        "# 1 枚目",
+      ].join("\n"),
+    );
+    assert.doesNotMatch(css, /@import|example\.invalid/i);
+    assert.match(css, /^div\.marpit/);
+    assert.match(css, /color:\s*(?:rgb\(1,\s*2,\s*3\)|#010203)/);
   });
 
   test("普通の Markdown の表示は変わらない（frontmatter が無ければ renderMarkdown のまま）", () => {
