@@ -21,39 +21,43 @@ export const FEED_ENTRY_LIMIT = 20;
  */
 export function buildAtomFeed(posts: readonly PostContent[], now: Date): string {
   const siteUrl = absoluteUrl(HOME_PATH);
-  const latest = [...posts]
+  const latestPosts = [...posts]
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
-    .slice(0, FEED_ENTRY_LIMIT)
-    .map((post) => ({ post, url: absoluteUrl(postPath(post.slug)), updated: entryUpdated(post) }));
-
-  const feedUpdated = latest.reduce(
-    (max, { updated }) => (updated > max ? updated : max),
-    latest.length > 0 ? latest[0].updated : now.toISOString(),
-  );
+    .slice(0, FEED_ENTRY_LIMIT);
+  const updatedTimes = latestPosts.map(entryUpdated);
+  const feedUpdated = updatedTimes.reduce((max, updated) => (updated > max ? updated : max), updatedTimes[0] ?? now.toISOString());
 
   const lines = [
     `<?xml version="1.0" encoding="utf-8"?>`,
     `<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="ja">`,
-    `  <id>${escapeXml(siteUrl)}</id>`,
-    `  <title>${escapeXml(SITE_NAME)}</title>`,
-    `  <subtitle>${escapeXml(SITE_DESCRIPTION)}</subtitle>`,
-    `  <updated>${feedUpdated}</updated>`,
-    `  <link rel="self" type="application/atom+xml" href="${escapeXml(absoluteUrl(FEED_PATH))}"/>`,
-    `  <link rel="alternate" type="text/html" href="${escapeXml(siteUrl)}"/>`,
-    `  <author><name>${escapeXml(AUTHOR_NAME)}</name></author>`,
-    ...latest.flatMap(({ post, url, updated }) => [
-      `  <entry>`,
-      `    <id>${escapeXml(url)}</id>`,
-      `    <title>${escapeXml(post.title)}</title>`,
-      `    <link rel="alternate" type="text/html" href="${escapeXml(url)}"/>`,
-      `    <published>${toRfc3339(post.publishedAt)}</published>`,
-      `    <updated>${updated}</updated>`,
-      `    <summary>${escapeXml(post.summary)}</summary>`,
-      `  </entry>`,
-    ]),
+    `  ${element("id", siteUrl)}`,
+    `  ${element("title", SITE_NAME)}`,
+    `  ${element("subtitle", SITE_DESCRIPTION)}`,
+    `  ${element("updated", feedUpdated)}`,
+    `  ${link({ rel: "self", type: "application/atom+xml", href: absoluteUrl(FEED_PATH) })}`,
+    `  ${link({ rel: "alternate", type: "text/html", href: siteUrl })}`,
+    `  <author>${element("name", AUTHOR_NAME)}</author>`,
+    ...latestPosts.flatMap(entryLines),
     `</feed>`,
   ];
+
   return `${lines.join("\n")}\n`;
+}
+
+/** フィードの 1 記事分の行 */
+function entryLines(post: PostContent): string[] {
+  const url = absoluteUrl(postPath(post.slug));
+
+  return [
+    `  <entry>`,
+    `    ${element("id", url)}`,
+    `    ${element("title", post.title)}`,
+    `    ${link({ rel: "alternate", type: "text/html", href: url })}`,
+    `    ${element("published", toRfc3339(post.publishedAt))}`,
+    `    ${element("updated", entryUpdated(post))}`,
+    `    ${element("summary", post.summary)}`,
+    `  </entry>`,
+  ];
 }
 
 /** entry の updated。公開後に更新したときだけ updatedAt を使う */
@@ -70,14 +74,12 @@ function toRfc3339(value: string): string {
 export function buildSitemap(posts: readonly PostContent[]): string {
   const entries = posts.map((post) => ({ url: absoluteUrl(postPath(post.slug)), lastModified: post.updatedAt }));
   const home = { url: absoluteUrl(HOME_PATH), lastModified: latest(entries.map((entry) => entry.lastModified)) };
-  const urls = [home, ...entries].map(({ url, lastModified }) =>
-    [
-      "<url>",
-      `<loc>${escapeXml(url)}</loc>`,
-      ...(lastModified !== undefined ? [`<lastmod>${escapeXml(lastModified)}</lastmod>`] : []),
-      "</url>",
-    ].join("\n"),
-  );
+  const urls = [home, ...entries].map(({ url, lastModified }) => {
+    const lastmod = lastModified === undefined ? [] : [element("lastmod", lastModified)];
+
+    return ["<url>", element("loc", url), ...lastmod, "</url>"].join("\n");
+  });
+
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
@@ -100,7 +102,19 @@ export function buildRobots(): string {
   return `User-Agent: *\nAllow: /\n\nSitemap: ${absoluteUrl("/sitemap.xml")}\n`;
 }
 
-// XML 1.0 で使えない制御文字（タブ、改行、復帰以外の C0 制御文字など）。残すと XML として壊れる
+/** <name>text</name> */
+function element(name: string, text: string): string {
+  return `<${name}>${escapeXml(text)}</${name}>`;
+}
+
+/** <link …/> */
+function link(attrs: Record<string, string>): string {
+  const attrList = Object.entries(attrs).map(([name, value]) => ` ${name}="${escapeXml(value)}"`);
+
+  return `<link${attrList.join("")}/>`;
+}
+
+// XML 1.0 で使えない制御文字（タブ、改行、復帰以外の C0 制御文字など）。残すと XML として不正になる
 const INVALID_XML_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
 
 const xmlEntities: Record<string, string> = {
