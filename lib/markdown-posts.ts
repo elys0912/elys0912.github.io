@@ -7,6 +7,8 @@
 // - UTF-8 で書く（BOM は取り除く）
 // - 先頭の `---` で囲んだ frontmatter に title、summary、publishedAt（オフセット付きの ISO 8601）を書く。
 //   draft: true は下書き。marp: true はスライドの記事で、Marp の指定（theme など）はこのときだけ書ける
+// - 作品として読むとき（loadPostDirectory の options.work）だけ、作品の付帯情報 badge、tech、repository を書ける。
+//   ブログ（options を渡さない）では、ほかの知らないキーと同じくエラーにする
 // - frontmatter は YAML のうち、parseFrontmatter の規則の範囲だけを読む。範囲の外の書き方は推測せず、エラーにする
 //   （例: draft:true、Draft: true、インデントした draft: true を、下書きと読み損ねて公開しないため）
 // 読めないファイルは理由を warn に渡してスキップする（ビルドを止めたいときは、warn で例外を投げる）。
@@ -18,10 +20,32 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { PostContent } from "./post-types";
 
-type FrontmatterValue = string | boolean;
+type FrontmatterValue = string | boolean | string[];
+
+/** 作品のバッジ。play は遊べるゲーム、live は稼働中のサイト、oss は公開リポジトリ */
+export const WORK_BADGES = ["play", "live", "oss"] as const;
+export type WorkBadge = (typeof WORK_BADGES)[number];
+
+/** 作品の付帯情報（作品として読んだときだけ付く） */
+export type WorkFields = {
+  /** 無ければ付けない */
+  badge?: WorkBadge;
+  /** 書いた順。無ければ空 */
+  tech: string[];
+  /** https の URL。無ければ付けない */
+  repositoryUrl?: string;
+};
+
+/** 作品として読んだ記事 */
+export type WorkPostContent = PostContent & WorkFields;
+
+export type LoadOptions = {
+  /** 作品として読む（作品の付帯情報 badge、tech、repository を許す） */
+  work?: boolean;
+};
 
 export interface ParsedMarkdown {
-  /** 1 行で書いた値。引用符付きの文字列、真偽値、素の文字列 */
+  /** 1 行で書いた値。引用符付きの文字列、真偽値、素の文字列、1 行のリスト（[a, b]。要素は素の文字列） */
   data: Record<string, FrontmatterValue>;
   /** ブロック（`|` や `>`）で書いたキー。値は読まない（Marp の記事では、行をそのまま本文の先頭に残す） */
   blockKeys: string[];
@@ -37,8 +61,16 @@ const MARP_KEY = "marp";
 /** Marp の記事（marp: true）にだけ書けるキー（Marp のグローバルディレクティブ） */
 const MARP_DIRECTIVE_KEYS = new Set(["theme", "paginate", "class", "style", "header", "footer", "size", "math"]);
 const KNOWN_KEYS = [...POST_KEYS, MARP_KEY, ...MARP_DIRECTIVE_KEYS];
+/** 作品の付帯情報のキー。作品として読むときだけ書ける。frontmatter から取り除く（Marp の記事でも本文に残さない） */
+const WORK_KEYS = new Set(["badge", "tech", "repository"]);
+const WORK_KNOWN_KEYS = [...KNOWN_KEYS, ...WORK_KEYS];
 const MAX_TITLE_LENGTH = 200;
 const MAX_SUMMARY_LENGTH = 500;
+const MAX_TECH_ITEMS = 10;
+const MAX_TECH_LENGTH = 40;
+const MAX_REPOSITORY_URL_LENGTH = 500;
+/** repository の形。https で、ホスト名（ドットを含む）の後に、空白を含まない ASCII のパスを置ける（ContentLoader と同じ） */
+const REPOSITORY_URL = /^https:\/\/[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:\/[!-~]*)?$/;
 
 const DELIMITER = "---";
 const MARKDOWN_SUFFIX = ".md";
@@ -51,6 +83,10 @@ const FORBIDDEN_CHARACTER = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009
 const DOUBLE_QUOTED = /^"((?:[^"\\]|\\["\\])*)"(?: +#.*)? *$/;
 /** 1 行の '…'。'' は ' 1 字 */
 const SINGLE_QUOTED = /^'((?:[^']|'')*)'(?: +#.*)? *$/;
+/** 1 行のリスト [a, b]。中に括弧は書けない（入れ子にしない）。後ろには空白と # からのコメントだけを置ける */
+const FLOW_SEQUENCE = /^\[([^[\]{}]*)\](?: +#.*)? *$/;
+/** リストの要素に書けない文字（YAML のリストの中で記号になる括弧と、空白の後の #） */
+const FLOW_ITEM_FORBIDDEN = /[[\]{}]|[ \t]#/;
 /** ブロックの始まり（| か >。+ か - の指定と、後ろのコメントは可。インデントの数の指定は不可） */
 const BLOCK_HEADER = /^[|>][+-]?(?: +#.*)? *$/;
 /** YAML の記号で始まり、文字列として読まれない値 */
@@ -74,7 +110,8 @@ const BLANK = /^[\t \u1680\u2000-\u2006\u2008-\u200A\u205F\u3000]*$/;
  * - 空の行（空白だけも可）、行頭が `#` のコメント
  * - 行頭から書いた `key: value`（key は英字か _ で始まり、英数字、_、- が続く）。同じキーは 1 回だけ
  *   - value は `"…"`（エスケープは `\"` と `\\` だけ）、`'…'`、素の文字列、真偽値（true / false / yes / no / on / off。
- *     先頭だけ大文字、全部大文字も可）のどれか。後ろの ` # …` はコメント
+ *     先頭だけ大文字、全部大文字も可）、1 行のリスト `[a, b]` のどれか。後ろの ` # …` はコメント
+ *   - リストの要素は素の文字列だけ（引用符、真偽値、括弧、空白の後の #、空の要素は不可）。空のリスト `[]` も不可
  *   - 素の文字列は、空、null（`~` を含む）、数値や日付に見えるもの、YAML の記号で始まるもの、`: ` を含むものは不可（引用符で囲む）
  *   - value が `|` か `>`（`+` か `-` を付けても可）のときはブロック。続く行は、空白で 1 段以上インデントし、
  *     インデントを最初の行より浅くしない。最初の行の前に空白だけの行を置かない
@@ -135,7 +172,7 @@ export function parseFrontmatter(text: string): ParsedMarkdown | string {
       return;
     }
     const scalar = parseScalar(value);
-    if (typeof scalar === "object") errors.push(`${where}: ${key} の${scalar.reason}`);
+    if (typeof scalar === "object" && !Array.isArray(scalar)) errors.push(`${where}: ${key} の${scalar.reason}`);
     else data.set(key, scalar);
   });
   if (errors.length > 0) return errors.join(" / ");
@@ -153,8 +190,36 @@ function parseScalar(value: string): FrontmatterValue | { reason: string } {
     if (single) return single[1].replace(/''/g, "'");
     return { reason: "'…' を読めません（1 行で閉じる。後ろにはコメントだけを置ける）" };
   }
+  if (value.startsWith("[")) return parseFlowSequence(value);
   // 空白（タブを含む）の後の # から行末まではコメント
   const plain = value.replace(/(?:^|[ \t]+)#.*$/, "").replace(/[ \t]+$/, "");
+  return parsePlain(plain);
+}
+
+/** 1 行のリスト [a, b]。要素は素の文字列だけ */
+function parseFlowSequence(value: string): string[] | { reason: string } {
+  const match = FLOW_SEQUENCE.exec(value);
+  if (!match) return { reason: "[…] を読めません（1 行で閉じる。括弧を入れ子にしない。後ろにはコメントだけを置ける）" };
+  const inner = match[1];
+  // 空白は YAML と同じく、スペースとタブだけを数える（ContentLoader と判定をそろえる）
+  if (/^[ \t]*$/.test(inner)) return { reason: "リストが空です（書かないならキーごと消す）" };
+  const items: string[] = [];
+  for (const raw of inner.split(",")) {
+    const item = raw.replace(/^[ \t]+|[ \t]+$/g, "");
+    if (item === "") return { reason: "リストに空の要素があります" };
+    if (FLOW_ITEM_FORBIDDEN.test(item)) return { reason: `リストの要素に括弧か「 #」があります: ${item}` };
+    if (BOOLEANS.has(item)) return { reason: `リストの要素が真偽値として読まれます: ${item}` };
+    const parsed = parsePlain(item);
+    if (typeof parsed !== "string") {
+      return { reason: `リストの要素は素の文字列で書く（${typeof parsed === "object" ? parsed.reason : item}）` };
+    }
+    items.push(parsed);
+  }
+  return items;
+}
+
+/** コメントを除いた素の値。真偽値の語なら真偽値、それ以外は文字列 */
+function parsePlain(plain: string): string | boolean | { reason: string } {
   if (plain === "" || NULLS.has(plain)) return { reason: "値が空です（null は使わない）" };
   if (SPECIAL_START.test(plain)) return { reason: `値が YAML の記号で始まります。文字列なら引用符で囲む: ${plain}` };
   if (/:(?:[ \t]|$)/.test(plain)) return { reason: `値に「: 」があります。文字列なら引用符で囲む: ${plain}` };
@@ -166,8 +231,19 @@ function parseScalar(value: string): FrontmatterValue | { reason: string } {
  * ディレクトリの直下の *.md を読み、記事の配列にして返す（並びはファイル名順）。
  * 下書きと未来の publishedAt も含める（出すかどうかは呼び出し側で決める）。
  * ディレクトリが無ければ空の配列。読めないファイルと . で始まる .md は、理由を warn に渡してスキップする。
+ * options.work を付けると作品として読み、作品の付帯情報（badge、tech、repository）を許して WorkFields を付ける。
  */
-export function loadPostDirectory(dir: string, warn: (message: string) => void = console.warn): PostContent[] {
+export function loadPostDirectory(dir: string, warn?: (message: string) => void): PostContent[];
+export function loadPostDirectory(
+  dir: string,
+  warn: ((message: string) => void) | undefined,
+  options: LoadOptions & { work: true },
+): WorkPostContent[];
+export function loadPostDirectory(
+  dir: string,
+  warn: (message: string) => void = console.warn,
+  options: LoadOptions = {},
+): PostContent[] {
   if (!isDirectory(dir)) return [];
   const dirName = path.basename(dir);
   const posts: PostContent[] = [];
@@ -186,7 +262,7 @@ export function loadPostDirectory(dir: string, warn: (message: string) => void =
       continue;
     }
     const slug = name.slice(0, -MARKDOWN_SUFFIX.length);
-    const result = parsePost(readFileSync(file), slug);
+    const result = parsePost(readFileSync(file), slug, options.work === true);
     if (typeof result === "string") {
       warn(`[markdown-posts] ${label} をスキップしました: ${result}`);
     } else {
@@ -196,8 +272,8 @@ export function loadPostDirectory(dir: string, warn: (message: string) => void =
   return posts;
 }
 
-/** 1 ファイル分を記事にする。読めなければ理由の文字列を返す */
-function parsePost(bytes: Uint8Array, slug: string): PostContent | string {
+/** 1 ファイル分を記事にする。work なら作品として読む（付帯情報を許す）。読めなければ理由の文字列を返す */
+function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent | WorkPostContent | string {
   let text: string;
   try {
     // BOM は parseFrontmatter が 1 つだけ取り除く（ここでも取り除くと、BOM が 2 つあるファイルを読めてしまう）
@@ -211,16 +287,23 @@ function parsePost(bytes: Uint8Array, slug: string): PostContent | string {
 
   const errors: string[] = [];
   const keys = [...Object.keys(data), ...blockKeys];
+  const knownKeys = work ? WORK_KNOWN_KEYS : KNOWN_KEYS;
   for (const key of keys) {
-    if (KNOWN_KEYS.includes(key)) continue;
-    const known = KNOWN_KEYS.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
+    if (knownKeys.includes(key)) continue;
+    const known = knownKeys.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
     errors.push(
-      known ? `${key} は読めません（${known} と大文字小文字が違う）` : `${key} は読めません（書けるキーは ${KNOWN_KEYS.join("、")}）`,
+      known ? `${key} は読めません（${known} と大文字小文字が違う）` : `${key} は読めません（書けるキーは ${knownKeys.join("、")}）`,
     );
   }
   for (const key of blockKeys) {
-    if (POST_KEYS.has(key) || key === MARP_KEY) errors.push(`${key} はブロック（| や >）にせず 1 行で書く`);
+    if (POST_KEYS.has(key) || key === MARP_KEY || (work && WORK_KEYS.has(key))) {
+      errors.push(`${key} はブロック（| や >）にせず 1 行で書く`);
+    }
   }
+  // リストは作品の tech にだけ書ける（Marp の指定にリストを書くと、そのまま本文の先頭に残ってしまう）
+  const lists = Object.keys(data).filter((key) => Array.isArray(data[key]) && !WORK_KEYS.has(key));
+  if (lists.length > 0) errors.push(`${lists.join("、")} はリストにせず 1 つの値で書く（リストは tech だけ）`);
+  const workFields = work ? readWorkFields(data, errors) : undefined;
 
   // ブロックで書いたキーは上でエラーにしたので、「ありません」は重ねない
   const missing = (key: string) => !Object.hasOwn(data, key) && !blockKeys.includes(key);
@@ -243,11 +326,11 @@ function parsePost(bytes: Uint8Array, slug: string): PostContent | string {
     return errors.join(" / ");
   }
 
-  // Marp の記事は、title などを除いた frontmatter を本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）。
+  // Marp の記事は、title などと作品の付帯情報を除いた frontmatter を本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）。
   // yes / on などで書いた真偽値は true / false に書き直す
   const kept = lines.flatMap((line) => {
     const key = KEY_LINE.exec(line)?.[1];
-    if (key !== undefined && POST_KEYS.has(key)) return [];
+    if (key !== undefined && (POST_KEYS.has(key) || WORK_KEYS.has(key))) return [];
     const value = key !== undefined && Object.hasOwn(data, key) ? data[key] : undefined;
     return typeof value === "boolean" ? [`${key}: ${value}`] : [line];
   });
@@ -260,7 +343,44 @@ function parsePost(bytes: Uint8Array, slug: string): PostContent | string {
     publishedAt: publishedAtUtc,
     updatedAt: publishedAtUtc,
     ...(draft === true ? { draft } : {}),
+    ...workFields,
   };
+}
+
+/**
+ * 作品の付帯情報を読む（ContentLoader の readWorkMeta と同じ規則）。問題は errors に足す。
+ * - badge：WORK_BADGES のどれか。oss ならリポジトリが要る
+ * - tech：1 行のリスト。1〜MAX_TECH_ITEMS 個、1 個 MAX_TECH_LENGTH 文字まで、同じ語は 1 回だけ
+ * - repository：REPOSITORY_URL の形で MAX_REPOSITORY_URL_LENGTH 文字まで
+ * ブロックで書いたキーは data に入らない（呼び出し側でエラーにしてある）。
+ */
+function readWorkFields(data: Record<string, FrontmatterValue>, errors: string[]): WorkFields {
+  const { badge, tech, repository } = data;
+  const fields: WorkFields = { tech: [] };
+  if (badge !== undefined) {
+    if (typeof badge === "string" && isWorkBadge(badge)) fields.badge = badge;
+    else errors.push(`badge は ${WORK_BADGES.join("、")} のどれかで書く`);
+  }
+  if (tech !== undefined) {
+    if (!Array.isArray(tech)) errors.push("tech は 1 行のリストで書く（例: tech: [TypeScript, Node.js]）");
+    else if (tech.length > MAX_TECH_ITEMS) errors.push(`tech は ${MAX_TECH_ITEMS} 個まで`);
+    else if (tech.some((item) => [...item].length > MAX_TECH_LENGTH)) errors.push(`tech の 1 個は ${MAX_TECH_LENGTH} 文字まで`);
+    else if (new Set(tech).size !== tech.length) errors.push("tech に同じ語が 2 回以上あります");
+    else fields.tech = tech;
+  }
+  if (repository !== undefined) {
+    if (typeof repository === "string" && REPOSITORY_URL.test(repository) && repository.length <= MAX_REPOSITORY_URL_LENGTH) {
+      fields.repositoryUrl = repository;
+    } else {
+      errors.push(`repository は https の URL で書く（例: https://github.com/owner/repo。${MAX_REPOSITORY_URL_LENGTH} 文字まで）`);
+    }
+  }
+  if (badge === "oss" && repository === undefined) errors.push("badge: oss には repository が要る");
+  return fields;
+}
+
+function isWorkBadge(value: string): value is WorkBadge {
+  return (WORK_BADGES as readonly string[]).includes(value);
 }
 
 /** 必須の文字列。空白だけは不可、長さはコードポイントで数える */

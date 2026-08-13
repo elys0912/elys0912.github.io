@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, test } from "node:test";
-import { loadPostDirectory, parseFrontmatter } from "./markdown-posts.ts";
+import { loadPostDirectory, parseFrontmatter, type WorkPostContent } from "./markdown-posts.ts";
 import fixture from "./markdown-posts.cases.json" with { type: "json" };
 
 describe("parseFrontmatter", () => {
@@ -54,6 +54,22 @@ describe("parseFrontmatter", () => {
     assert.match(String(parsed), /frontmatter の 2 行目: 「key: value」の形で読めません/);
     assert.match(String(parsed), /frontmatter の 3 行目: インデントした行は読めません/);
     assert.match(String(parsed), /frontmatter の 4 行目: title の値が数値や日付として読まれます/);
+  });
+
+  test("1 行のリストは要素の文字列の配列にし、要素の前後の空白とリストの後ろのコメントは読まない", () => {
+    const parsed = parseFrontmatter(["---", "tech: [ TypeScript ,Node.js, C#] # メモ", "---", ""].join("\n"));
+    assert.ok(typeof parsed === "object", String(parsed));
+    assert.deepEqual(parsed.data, { tech: ["TypeScript", "Node.js", "C#"] });
+  });
+
+  test("リストの要素に書けない値は、理由を返す", () => {
+    const reason = (value: string) => parseFrontmatter(["---", `tech: ${value}`, "---", ""].join("\n"));
+    assert.match(String(reason("[]")), /リストが空です/);
+    assert.match(String(reason("[a, ]")), /リストに空の要素があります/);
+    assert.match(String(reason("[a, [b]]")), /\[…\] を読めません/);
+    assert.match(String(reason("[a #b]")), /リストの要素に括弧か「 #」があります/);
+    assert.match(String(reason("[on]")), /リストの要素が真偽値として読まれます: on/);
+    assert.match(String(reason("[1.0]")), /リストの要素は素の文字列で書く（値が数値や日付として読まれます/);
   });
 
   test("先頭が --- でない、閉じの --- が無ければ理由を返す", () => {
@@ -181,14 +197,67 @@ describe("loadPostDirectory", () => {
   });
 });
 
+describe("loadPostDirectory の作品の付帯情報（options.work）", () => {
+  let dir: string;
+
+  before(() => {
+    dir = mkdtempSync(path.join(tmpdir(), "markdown-posts-work-"));
+    const head = ["---", "title: t", "summary: s", "publishedAt: 2026-10-01T00:00:00Z"];
+    const write = (file: string, lines: string[]) => writeFileSync(path.join(dir, file), [...head, ...lines].join("\n"));
+    write("meta.md", ["badge: oss", "tech: [TypeScript, Node.js]", "repository: https://github.com/example/a", "---", "# 本文"]);
+    write("plain.md", ["---", "# 本文"]);
+    write("slides.md", ["marp: true", "theme: default", "badge: live", "tech: [Marp]", "---", "# 1 枚目"]);
+  });
+
+  after(() => rmSync(dir, { recursive: true, force: true }));
+
+  test("作品として読むと、付帯情報を付ける。書いていない作品は tech だけが空の配列", () => {
+    const posts = loadPostDirectory(dir, () => {}, { work: true });
+    const bySlug = new Map(posts.map((post) => [post.slug, post]));
+    assert.deepEqual(
+      { badge: bySlug.get("meta")?.badge, tech: bySlug.get("meta")?.tech, repositoryUrl: bySlug.get("meta")?.repositoryUrl },
+      { badge: "oss", tech: ["TypeScript", "Node.js"], repositoryUrl: "https://github.com/example/a" },
+    );
+    assert.equal(bySlug.get("meta")?.bodyMarkdown, "# 本文");
+    const plain = bySlug.get("plain");
+    assert.deepEqual(plain?.tech, []);
+    assert.ok(plain && !("badge" in plain) && !("repositoryUrl" in plain));
+  });
+
+  test("Marp の作品でも、付帯情報は本文の先頭の frontmatter に残さない", () => {
+    const slides = loadPostDirectory(dir, () => {}, { work: true }).find((post) => post.slug === "slides");
+    assert.equal(slides?.bodyMarkdown, ["---", "marp: true", "theme: default", "---", "# 1 枚目"].join("\n"));
+    assert.equal(slides?.badge, "live");
+  });
+
+  test("作品として読まない（ブログ）と、付帯情報のキーは知らないキーとしてエラーにし、付帯情報も付けない", () => {
+    const warnings: string[] = [];
+    const posts = loadPostDirectory(dir, (message) => warnings.push(message));
+    assert.deepEqual(
+      posts.map((post) => post.slug),
+      ["plain"],
+    );
+    assert.ok(!("tech" in posts[0]));
+    assert.equal(warnings.length, 2);
+    assert.match(warnings[0], /meta\.md をスキップしました: badge は読めません/);
+    assert.match(warnings[1], /slides\.md をスキップしました: badge は読めません/);
+  });
+});
+
 // markdown-posts.cases.json のケース。API の取り込み側のテストも同じケースを流し、同じ判定になることを確かめる
 interface FixtureCase {
   name: string;
   file?: string;
+  /** true なら作品として読む（作品の付帯情報を許す） */
+  work?: boolean;
   lines: string[];
   expect: "post" | "error" | "ignored";
   draft?: boolean;
   title?: string;
+  /** 作品として読む post のケースで比べる付帯情報（書いていなければ無し） */
+  badge?: string;
+  tech?: string[];
+  repository?: string;
 }
 
 describe("markdown-posts.cases.json", () => {
@@ -211,13 +280,21 @@ describe("markdown-posts.cases.json", () => {
       mkdirSync(dir, { recursive: true });
       writeFileSync(path.join(dir, testCase.file ?? "a.md"), testCase.lines.join("\n"));
       const warnings: string[] = [];
-      const posts = loadPostDirectory(dir, (message) => warnings.push(message));
+      const warn = (message: string) => warnings.push(message);
+      const posts = testCase.work ? loadPostDirectory(dir, warn, { work: true }) : loadPostDirectory(dir, warn);
 
       if (testCase.expect === "post") {
         assert.deepEqual(warnings, []);
         assert.equal(posts.length, 1);
         assert.equal(posts[0].draft ?? false, testCase.draft);
         assert.equal(posts[0].title, testCase.title);
+        if (testCase.work) {
+          const { badge, tech, repositoryUrl } = posts[0] as WorkPostContent;
+          assert.deepEqual(
+            { badge, tech, repositoryUrl },
+            { badge: testCase.badge, tech: testCase.tech ?? [], repositoryUrl: testCase.repository },
+          );
+        }
       } else {
         assert.equal(warnings.length, testCase.expect === "error" ? 1 : 0, warnings.join("\n"));
         assert.deepEqual(posts, []);
