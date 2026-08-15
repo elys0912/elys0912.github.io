@@ -10,6 +10,8 @@ export type PostListItem = {
   publishedAt: string;
   /** 下書きなら true。公開済みなら付けないか false */
   draft?: boolean;
+  /** 記事のタグ（書いた順）。書いていなければ付けない（API の記事と作品にも無い） */
+  tags?: string[];
 };
 
 /** 詳細に出す 1 件。本文の Markdown を含む */
