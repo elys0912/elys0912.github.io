@@ -1,4 +1,4 @@
-// ページの HTML。トップ（記事一覧）、記事、404 と、共通の <head>、ヘッダー、フッター。
+// ページの HTML。トップ（記事一覧）、月別の一覧、記事、404 と、共通の <head>、ヘッダー、フッター。
 // HTML の構造と class 名は portfolio（Next.js の React コンポーネント）が出すものにそろえる。
 // 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠。
 // class 名は css.ts が書き換えた名前を classOf で引く。CSS に無い class は、CSS Modules と同じく属性ごと出さない。
@@ -9,9 +9,13 @@ import { formatDate } from "../shared/lib/format.ts";
 import { renderMarkdownWithHeadings, type Heading } from "../shared/lib/markdown.ts";
 import { isMarpMarkdown, renderMarp } from "../shared/lib/marp.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
+import { groupPostsByMonth, type MonthArchive } from "./archive.ts";
 import { classOf, type ModuleName } from "./css.ts";
 import {
   absoluteUrl,
+  archiveDescription,
+  archivePath,
+  archiveTitle,
   AUTHOR_NAME,
   CONTENT_SECURITY_POLICY,
   FEED_PATH,
@@ -50,14 +54,36 @@ type HeadOptions = {
 
 /** トップページ（記事一覧） */
 export function homePage(posts: readonly PostContent[], ctx: PageContext): string {
-  const heading = `<div${cls("PostList", "heading")}><h1>${escapeHtml(POST_LIST_TITLE)}</h1><p${cls("PostList", "count")}>${posts.length} 件</p></div>`;
+  const heading = postListHeading(POST_LIST_TITLE, posts.length);
   const lead = `<p${cls("PostList", "lead")}>${escapeHtml(POST_LIST_LEAD)}</p>`;
-  const list =
-    posts.length === 0
-      ? `<p${cls("PostList", "empty")}>${escapeHtml(POST_LIST_EMPTY_TEXT)}</p>`
-      : `<ul${cls("PostList", "list")}>${posts.map(postCard).join("")}</ul>`;
+  const list = postList(posts);
 
   return page(ctx, { description: SITE_DESCRIPTION, path: HOME_PATH }, withSidebar(`${heading}${lead}${list}`, posts));
+}
+
+/** 月別の一覧ページ。見た目はトップと同じ部品。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
+export function archivePage(archive: MonthArchive, posts: readonly PostContent[], ctx: PageContext): string {
+  const title = archiveTitle(archive.month);
+  const description = archiveDescription(archive.month);
+  const heading = postListHeading(title, archive.posts.length);
+  // 説明文は見出しと一覧のあいだの余白も兼ねる（PostList の .lead の margin）
+  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(description)}</p>`;
+  const list = postList(archive.posts);
+  const head = { title, description, path: archivePath(archive.month) };
+
+  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+}
+
+/** 記事一覧の見出しと件数 */
+function postListHeading(title: string, count: number): string {
+  return `<div${cls("PostList", "heading")}><h1>${escapeHtml(title)}</h1><p${cls("PostList", "count")}>${count} 件</p></div>`;
+}
+
+/** 記事一覧。記事が無いときは POST_LIST_EMPTY_TEXT */
+function postList(posts: readonly PostContent[]): string {
+  if (posts.length === 0) return `<p${cls("PostList", "empty")}>${escapeHtml(POST_LIST_EMPTY_TEXT)}</p>`;
+
+  return `<ul${cls("PostList", "list")}>${posts.map(postCard).join("")}</ul>`;
 }
 
 /** 一覧のページの中身を、右にサイドバーを置いた 2 列で包む。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
@@ -141,7 +167,7 @@ function tableOfContents(headings: readonly Heading[]): string {
  * posts は公開済みの全記事（新しい順）
  */
 function sidebar(posts: readonly PostContent[]): string {
-  const sections = [profileSection(), recentPostsSection(posts)];
+  const sections = [profileSection(), recentPostsSection(posts), monthsSection(posts)];
 
   return `<aside${cls("Sidebar", "sidebar")} aria-label="サイドバー">${sections.join("")}</aside>`;
 }
@@ -174,6 +200,17 @@ function recentPostsSection(posts: readonly PostContent[]): string {
   return sidebarSection("最近の記事", `<ul${cls("Sidebar", "recent")}>${items.join("")}</ul>`);
 }
 
+/** 月別（年月と件数。新しい順）。各月の一覧ページへのリンク */
+function monthsSection(posts: readonly PostContent[]): string {
+  const items = groupPostsByMonth(posts).map(({ month, posts: monthPosts }) => {
+    const link = `<a href="${escapeHtml(archivePath(month))}">${escapeHtml(month)}</a>`;
+
+    return `<li>${link} <span${cls("Sidebar", "monthCount")}>(${monthPosts.length})</span></li>`;
+  });
+
+  return sidebarSection("月別", `<ul${cls("Sidebar", "months")}>${items.join("")}</ul>`);
+}
+
 /** Marp のスライド。テーマの CSS は div.marpit の下にスコープされている。文字の自動縮小などは marp-core の browser script が当てる */
 function marpDeck(markdown: string, assets: Assets): string {
   const { html, css } = renderMarp(markdown);
@@ -192,7 +229,7 @@ function page({ assets, now }: PageContext, head: HeadOptions, main: string): st
 function headTags({ title, description, path, article, noindex }: HeadOptions, assets: Assets): string {
   // <title> と og:title はどちらも「タイトル | サイト名」。タイトルが無いページ（トップ）はサイト名だけ
   const fullTitle = title ? `${title} | ${SITE_NAME}` : SITE_NAME;
-  // og:title は、ページのメタデータを持つページ（トップと記事）だけがタイトル入り。404 はサイト名（Next.js 版と同じ）
+  // og:title は、ページのメタデータを持つページ（トップ、月別の一覧、記事）だけがタイトル入り。404 はサイト名（Next.js 版と同じ）
   const ogTitle = path !== undefined ? fullTitle : SITE_NAME;
   const url = path !== undefined ? absoluteUrl(path) : undefined;
   const image = absoluteUrl(OG_IMAGE.path);

@@ -93,23 +93,31 @@
 }
 
 .links a,
-.recent a {
+.recent a,
+.months a {
   color: var(--foreground);
   text-underline-offset: 0.2em;
 }
 
 .links a:hover,
-.recent a:hover {
+.recent a:hover,
+.months a:hover {
   color: var(--yellow);
 }
 
-.recent {
+.recent,
+.months {
   display: grid;
   gap: 8px;
   margin: 0;
   padding: 0;
   line-height: 1.5;
   list-style: none;
+}
+
+/* 月別の件数。「2026-10 (4)」の (4) */
+.monthCount {
+  color: var(--muted);
 }
 
 @media (max-width: 900px) {
