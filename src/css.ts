@@ -28,6 +28,7 @@ const MODULE_FILES = {
   PostDetail: "shared/components/PostDetail.module.css",
   TableOfContents: "shared/components/TableOfContents.module.css",
   MarpDeck: "shared/components/MarpDeck.module.css",
+  Sidebar: "src/Sidebar.module.css",
 } as const;
 
 export type ModuleName = keyof typeof MODULE_FILES;
