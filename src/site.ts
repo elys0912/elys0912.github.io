@@ -40,6 +40,26 @@ export const HISTORY_BACK_LABEL = "前のページへ戻る";
 /** サイト全体の OGP 画像（public/ に置く静的ファイル）。記事ごとの画像は無い */
 export const OG_IMAGE = { path: "/opengraph-image.png", width: 1200, height: 630, alt: SITE_NAME };
 
+/**
+ * Content-Security-Policy。GitHub Pages は応答ヘッダーを付けられないため、全ページの <meta http-equiv> で出す。
+ * 由来は portfolio が CloudFront の応答ヘッダーで付けている CSP。違いは次の 3 点。
+ * - frame-ancestors は外す。meta では無視される（report-uri と sandbox も同じ）
+ * - script-src の 'unsafe-inline' は外す。inline の script は無い（site.js と marp-browser.js は外部ファイル。Marp は script: false）
+ * - img-src に https: を足す。記事の Markdown の画像（shared/lib/markdown.ts の sanitize が src の https を許可）と Marp の画像は外部の URL を指せる
+ */
+export const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  // Marp の記事のテーマの <style> と、Marp の HTML の style 属性
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
 /** 記事一覧（トップページ） */
 export const HOME_PATH = "/";
 
