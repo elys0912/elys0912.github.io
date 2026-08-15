@@ -1,14 +1,12 @@
 {
   // 型の検査だけに使う（npm run typecheck）。実行は Node.js の型の除去（node src/build.ts）なので、出力はしない。
-  // 値の import には .ts の拡張子を付ける（Node.js が解決するため）。
-  // moduleResolution を nodenext にしないのは、shared/lib/markdown-posts.ts（portfolio から届く。編集しない）が
-  // 拡張子なしの `import type … from "./post-types"` を含み、nodenext では型の import でもエラー（TS2835）になるため。
-  // 実行時は import type が消えるので動く。src/ の拡張子の付け忘れは npm run build が失敗して気づく
+  // module と moduleResolution は nodenext。Node.js と同じ規則で解決するので、値の import には .ts の拡張子が要り、
+  // 付け忘れは typecheck で分かる（nodenext は型の import でも拡張子を求める。TS2835）
   "compilerOptions": {
     "target": "es2024",
     "lib": ["es2024", "dom", "dom.iterable"],
-    "module": "preserve",
-    "moduleResolution": "bundler",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "types": ["node"],
     "strict": true,
     "noEmit": true,
