@@ -51,6 +51,8 @@ publishedAt: 2026-10-10T09:00:00+09:00
 - 読めない記事（frontmatter の誤り、`draft:true` や `Draft: true` のような読めない書き方、`.` で始まる `.md`、`.md` でないファイル、slug の形）
 - 本文が 128KB を超える記事
 
+公開する記事が 1 件も無い（`content/blog/` が空・無い）ときも失敗する。記事の移動・削除の誤りで空のサイトを公開しないため。意図して 0 件にするときだけ `BLOG_ALLOW_NO_POSTS=1 npm run build` で実行する。
+
 ## 画像
 
 ```
@@ -59,7 +61,8 @@ content/images/<slug>/<ファイル名>.webp   （.png、.jpg、.jpeg も可）
 ```
 
 - `<slug>` は、その画像を使う記事の slug。本文では `/images/<slug>/<ファイル名>` の形で参照する（Marp のスライドの `url(…)` も同じ）
-- ビルドのとき、公開した記事から参照されている画像だけが `out/images/` にコピーされる。参照先が無ければ警告を出す
+- ビルドのとき、公開した記事から参照されている画像だけが `out/images/` にコピーされる。参照先が `content/images/` に無ければビルドが失敗する
+- 書き出した後、ページの `<img src>`、`/images/` で始まるリンク（本文の `[図](/images/<slug>/<ファイル名>.webp)` など）、Marp のスライドの `url(…)`（style の中）のうちサイト内を指すものが `out/` に無ければ、ビルドが失敗する。`srcset`、`<source>`、`<video poster>` と、`/images/` で始まらないリンクは確かめない。リンク（`[…](…)`）だけで参照した画像は `out/images/` にコピーされないので、ここで止まる（画像は `![…](…)` でも参照する）。先頭の `/` が無い、`?v=2` を付けた、`/images/` の綴り違い、`<slug>/` の下のサブディレクトリ、のような `/images/<slug>/<ファイル名>` の形でない参照は、画像がコピーされずにここで止まる（外部の URL は確かめない）
 - 画像の形式・サイズ・メタデータは検査しない。EXIF の位置情報などは消してから置き、スクリーンショットに個人名、メールアドレス、通知などが写っていないか確かめる。`![説明]` の説明は、画像が見えない人にも内容が伝わるように書く
 
 ## ビルドと確認
@@ -73,7 +76,7 @@ npm run build        # out/ に書き出す（node src/build.ts）
 npm run preview      # out/ を静的サーバーで開く（npx serve out。serve は依存に入れていない）
 ```
 
-記事を直したら `npm run build` をやり直す（開発サーバーは無い）。
+記事を直したら `npm run build` をやり直す（開発サーバーは無い）。ビルドが失敗したときは `out/` を消すので、`npm run preview` は直してビルドが通るまで使えない。
 
 ## 構成
 
@@ -95,6 +98,7 @@ npm run preview      # out/ を静的サーバーで開く（npx serve out。ser
 - `shared/` の下に、portfolio の `frontend/` と同じ相対パスで置く（例 `shared/lib/markdown.ts`、`shared/components/PostList.module.css`）
 - 並んでいるファイルは `shared-with-blog.txt`（portfolio の `frontend/` からの相対パス）。同期で上書きされるので、このリポジトリでは直さない。直すときは portfolio 側で直して同期する
 - HTML の構造と class 名は、portfolio の React コンポーネントが出すものに合わせて `src/html.ts` に書いている。portfolio のコンポーネントの構造を変えたら、`src/html.ts` も合わせる
+- `src/html.ts` が引く class が CSS に無いと、`npm run build` が失敗する（CSS Modules と同じく class 属性ごと消え、見た目だけが崩れるため）。同期で共有の CSS の class 名が変わったら `src/html.ts` を合わせる。意図して CSS に無い class（`PostList.main`）は `src/build.ts` の `EXPECTED_MISSING_CLASSES` に並べる
 
 ## デプロイ
 
