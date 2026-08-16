@@ -32,10 +32,13 @@ export const PROFILE_BIO = SITE_DESCRIPTION;
 /** サイドバーのプロフィールのアイコン（public/ に置く静的ファイル。180x180 を縮めて出す） */
 export const PROFILE_ICON = { path: "/apple-icon.png", size: 56 };
 
+/** portfolio へのリンク（サイドバーのプロフィールとフッターで使う） */
+export const PORTFOLIO_LINK = { href: "https://elysdev.net/", label: "ポートフォリオ" };
+
 /** サイドバーのプロフィールの下に並べるリンク */
 export const PROFILE_LINKS: readonly { href: string; label: string }[] = [
   { href: "https://github.com/elys0912", label: "GitHub" },
-  { href: "https://elysdev.net/", label: "ポートフォリオ" },
+  PORTFOLIO_LINK,
 ];
 
 /** サイドバーの「最近の記事」に出す件数 */
@@ -67,19 +70,14 @@ export function tagDescription(tag: string): string {
   return `タグ「${tag}」を付けた記事の一覧`;
 }
 
-/** フッターの著作権の表示の後ろに置くリンク（仮）。記事のライセンスを案内する */
+/** フッターの著作権の表示の後ろに置くリンク。記事のライセンスの案内と、portfolio */
 export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
   {
     href: "https://github.com/elys0912/elys0912.github.io/blob/main/content/LICENSE.md",
     label: "記事のライセンス",
   },
+  PORTFOLIO_LINK,
 ];
-
-/**
- * フッターの「前のページへ戻る」の文言。portfolio へ戻る仮の導線（src/client.js が履歴があるときだけ出す）。
- * TODO: portfolio の独自ドメインは公開済み（PROFILE_LINKS）。FOOTER_LINKS に portfolio へのリンクを足し、これとボタンを消すかは未決定
- */
-export const HISTORY_BACK_LABEL = "前のページへ戻る";
 
 /** サイト全体の OGP 画像（public/ に置く静的ファイル）。記事ごとの画像は無い */
 export const OG_IMAGE = { path: "/opengraph-image.png", width: 1200, height: 630, alt: SITE_NAME };
