@@ -3,22 +3,21 @@
 //
 // このリポジトリは公開リポジトリ。置いた記事はサイトに出なくても誰でも読める。そのため、公開する記事だけを置く。
 // 次のどれかがあれば、ビルドを止める（loadPosts が例外を投げる）。
-// - 読めないファイル（frontmatter の誤り、. で始まる .md、.md でないファイルなど。markdown-posts.ts の規則）
+// - 読めないファイル（frontmatter の誤り、タグの誤り、. で始まる .md、.md でないファイルなど。markdown-posts.ts の規則）
 // - slug（ファイル名）の形の誤り
 // - 本文が MAX_BODY_BYTES を超える
 // - draft: true の記事（下書きはこのリポジトリの外で書く）
 // - publishedAt が未来の記事（予約公開はしない）
-// - NFC に正規化した後のタグが MAX_TAG_LENGTH 文字を超える、または TAG_FORBIDDEN の文字を含む
-// - NFC に正規化すると同じになるタグが、1 つの記事に 2 回以上ある
 //
-// タグは読んだ直後に NFC に正規化する。見た目が同じで文字コードが違うタグ（NFC と NFD）を、同じタグとして数えるため。
-// src/tags.ts の検査と、タグの一覧・URL・ディレクトリ名は、正規化した後の値を使う。
+// タグは markdown-posts.ts が NFC に正規化してから検査し（個数・文字数・禁止文字・重複）、正規化した値を返す。
+// 見た目が同じで文字コードが違うタグ（NFC と NFD）は、同じタグとして数える。
+// src/tags.ts の検査と、タグの一覧・URL・ディレクトリ名は、この正規化した後の値を使う。
 //
 // 画像の参照の拾い方は src/images.ts。
 
 import path from "node:path";
 
-import { MAX_TAG_LENGTH, TAG_FORBIDDEN, loadPostDirectory } from "../shared/lib/markdown-posts.ts";
+import { loadPostDirectory } from "../shared/lib/markdown-posts.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
 
 /** リポジトリのルートから見た content/ と、記事と画像を置くディレクトリの名前 */
@@ -38,9 +37,7 @@ const MAX_BODY_BYTES = 128 * 1024;
  */
 export function loadPosts(contentDir: string, now: Date): PostContent[] {
   const problems: string[] = [];
-  const posts = loadPostDirectory(path.join(contentDir, POSTS_DIRECTORY_NAME), (message) => problems.push(message)).map(
-    normalizeTags,
-  );
+  const posts = loadPostDirectory(path.join(contentDir, POSTS_DIRECTORY_NAME), (message) => problems.push(message));
   for (const post of posts) problems.push(...postProblems(post, now));
 
   if (problems.length > 0) {
@@ -49,13 +46,6 @@ export function loadPosts(contentDir: string, now: Date): PostContent[] {
   }
 
   return posts.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || a.slug.localeCompare(b.slug));
-}
-
-/** タグを NFC に正規化した記事を返す。タグの並びは変えない */
-function normalizeTags(post: PostContent): PostContent {
-  if (post.tags === undefined) return post;
-
-  return { ...post, tags: post.tags.map((tag) => tag.normalize("NFC")) };
 }
 
 /** 1 記事分の、ブログの規則に合わない点 */
@@ -69,17 +59,6 @@ function postProblems(post: PostContent, now: Date): string[] {
   const bytes = new TextEncoder().encode(post.bodyMarkdown).length;
   if (bytes > MAX_BODY_BYTES) {
     problems.push(`${label}: 本文が ${bytes} バイトあります。${MAX_BODY_BYTES} バイト（128KB）までにする（記事を分ける）`);
-  }
-  // 読み込みの検査（shared/lib/markdown-posts.ts）は正規化の前の値で比べるため、正規化の後にもう一度比べる
-  const tags = post.tags ?? [];
-  if (tags.some((tag) => [...tag].length > MAX_TAG_LENGTH)) {
-    problems.push(`${label}: tags の 1 個は ${MAX_TAG_LENGTH} 文字まで（NFC に正規化して数えた結果）`);
-  }
-  if (tags.some((tag) => TAG_FORBIDDEN.test(tag))) {
-    problems.push(`${label}: tags の 1 個に空白、「,」、「/」を含めない（NFC に正規化して調べた結果）`);
-  }
-  if (new Set(tags).size !== tags.length) {
-    problems.push(`${label}: tags に同じタグが 2 回以上あります（NFC に正規化して比べた結果）`);
   }
   if (post.draft) {
     problems.push(`${label}: draft: true の記事は置かない（公開できる状態になってから draft の行を消して置く）`);
