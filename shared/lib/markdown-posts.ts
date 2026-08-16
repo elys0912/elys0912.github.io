@@ -146,8 +146,8 @@ export function parseFrontmatter(text: string): ParsedMarkdown | string {
   const blockKeys: string[] = [];
   const seen = new Set<string>();
   const errors: string[] = [];
-  // ブロックの中にいる間は、そのインデント（最初の行を読むまでは undefined）
-  let block: { indent?: number } | undefined;
+  // ブロックの中にいる間だけある
+  let block: Block | undefined;
   lines.forEach((line, index) => {
     const where = `frontmatter の ${index + 2} 行目`;
     if (FORBIDDEN_CHARACTER.test(line)) {
@@ -155,20 +155,9 @@ export function parseFrontmatter(text: string): ParsedMarkdown | string {
       block = undefined;
       return;
     }
-    if (block) {
-      if (line === "") return;
-      const indent = /^ */.exec(line)![0].length;
-      if (indent === line.length) {
-        if (block.indent === undefined) errors.push(`${where}: ブロックの最初の行の前に、空白だけの行を置かない`);
-        return;
-      }
-      if (indent > 0) {
-        if (block.indent === undefined) block.indent = indent;
-        else if (indent < block.indent) errors.push(`${where}: ブロックの行のインデントが最初の行より浅い`);
-        return;
-      }
-      block = undefined;
-    }
+    if (block && acceptBlockLine(block, line, where, errors)) return;
+    // インデントの無い行でブロックは終わる。この行は最上位の行として続けて読む
+    block = undefined;
     if (/^ *$/.test(line) || line.startsWith("#")) return;
     if (line.startsWith(" ") || line.startsWith("\t")) {
       errors.push(`${where}: インデントした行は読めません（キーは行頭から書く）: ${line.trim()}`);
@@ -193,6 +182,28 @@ export function parseFrontmatter(text: string): ParsedMarkdown | string {
   });
   if (errors.length > 0) return errors.join(" / ");
   return { data: Object.fromEntries(data), blockKeys, lines, body: all.slice(end + 1).join("\n") };
+}
+
+/** ブロック（`|` や `>`）の続きの行を読む状態。indent は最初の行のインデント（最初の行を読むまでは undefined） */
+type Block = { indent?: number };
+
+/**
+ * ブロックの続きの行を検査する。ブロックに属する行なら true、インデントの無い行なら false（ブロックの終わり）。
+ * 最初の行でインデントを決め、問題は errors に足す。
+ */
+function acceptBlockLine(block: Block, line: string, where: string, errors: string[]): boolean {
+  if (line === "") return true;
+
+  const indent = /^ */.exec(line)![0].length;
+  if (indent === line.length) {
+    if (block.indent === undefined) errors.push(`${where}: ブロックの最初の行の前に、空白だけの行を置かない`);
+    return true;
+  }
+  if (indent === 0) return false;
+
+  if (block.indent === undefined) block.indent = indent;
+  else if (indent < block.indent) errors.push(`${where}: ブロックの行のインデントが最初の行より浅い`);
+  return true;
 }
 
 function parseScalar(value: string): FrontmatterValue | { reason: string } {
@@ -298,21 +309,64 @@ function validateSlug(slug: string): string | undefined {
 
 /** 1 ファイル分を記事にする。work なら作品として読む（付帯情報を許す）。読めなければ理由の文字列を返す */
 function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent | WorkPostContent | string {
-  let text: string;
-  try {
-    // BOM は parseFrontmatter が 1 つだけ取り除く（ここでも取り除くと、BOM が 2 つあるファイルを読めてしまう）
-    text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
-  } catch {
-    return "UTF-8 として読めません";
-  }
+  const text = decodeUtf8(bytes);
+  if (text === undefined) return "UTF-8 として読めません";
   const parsed = parseFrontmatter(text);
   if (typeof parsed === "string") return parsed;
   const { data, blockKeys, lines, body } = parsed;
 
   const errors: string[] = [];
   const keys = [...Object.keys(data), ...blockKeys];
+  checkKeys(data, blockKeys, work, errors);
+  const workFields = work ? readWorkFields(data, errors) : undefined;
+  const tags = work ? undefined : readTags(data, errors);
+
+  // ブロックで書いたキーは上でエラーにしたので、「ありません」は重ねない
+  const missing = (key: string) => !Object.hasOwn(data, key) && !blockKeys.includes(key);
+  const { title, summary, publishedAt, draft = false, marp = false } = data;
+  checkText("title", title, MAX_TITLE_LENGTH, missing("title"), errors);
+  checkText("summary", summary, MAX_SUMMARY_LENGTH, missing("summary"), errors);
+  const publishedAtUtc = readPublishedAt(publishedAt, missing("publishedAt"), errors);
+  if (typeof draft !== "boolean") errors.push("draft は true か false で書く");
+  if (typeof marp !== "boolean") errors.push("marp は true か false で書く");
+  if (marp !== true) {
+    const directives = keys.filter((key) => MARP_DIRECTIVE_KEYS.has(key));
+    if (directives.length > 0) errors.push(`${directives.join("、")} は Marp の記事（marp: true）にだけ書ける`);
+  }
+  // 型の絞り込みのための条件（errors が空なら、title と summary は文字列、publishedAtUtc はある）
+  if (errors.length > 0 || typeof title !== "string" || typeof summary !== "string" || publishedAtUtc === undefined) {
+    return errors.join(" / ");
+  }
+
+  // Marp の記事は、frontmatter の残りを本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）
+  const bodyMarkdown = marp === true ? [DELIMITER, ...keepMarpFrontmatterLines(lines, data), DELIMITER, body].join("\n") : body;
+  return {
+    slug,
+    title,
+    summary,
+    bodyMarkdown,
+    publishedAt: publishedAtUtc,
+    updatedAt: publishedAtUtc,
+    ...(draft === true ? { draft } : {}),
+    ...(tags !== undefined ? { tags } : {}),
+    ...workFields,
+  };
+}
+
+/** UTF-8 として読む。読めなければ undefined */
+function decodeUtf8(bytes: Uint8Array): string | undefined {
+  try {
+    // BOM は parseFrontmatter が 1 つだけ取り除く（ここでも取り除くと、BOM が 2 つあるファイルを読めてしまう）
+    return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+}
+
+/** キーの種類を検査する（知らないキー、ブロックにできないキー、リストにできないキー）。問題は errors に足す */
+function checkKeys(data: Record<string, FrontmatterValue>, blockKeys: string[], work: boolean, errors: string[]): void {
   const knownKeys = work ? WORK_KNOWN_KEYS : BLOG_KNOWN_KEYS;
-  for (const key of keys) {
+  for (const key of [...Object.keys(data), ...blockKeys]) {
     if (knownKeys.includes(key)) continue;
     const known = knownKeys.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
     errors.push(
@@ -328,50 +382,19 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
   // 作品の tags と記事の tech は、上で知らないキーとしてエラーにしてある
   const lists = Object.keys(data).filter((key) => Array.isArray(data[key]) && !WORK_KEYS.has(key) && key !== TAGS_KEY);
   if (lists.length > 0) errors.push(`${lists.join("、")} はリストにせず 1 つの値で書く（リストは作品の tech と記事の tags だけ）`);
-  const workFields = work ? readWorkFields(data, errors) : undefined;
-  const tags = work ? undefined : readTags(data, errors);
+}
 
-  // ブロックで書いたキーは上でエラーにしたので、「ありません」は重ねない
-  const missing = (key: string) => !Object.hasOwn(data, key) && !blockKeys.includes(key);
-  const { title, summary, publishedAt, draft = false, marp = false } = data;
-  checkText("title", title, MAX_TITLE_LENGTH, missing("title"), errors);
-  checkText("summary", summary, MAX_SUMMARY_LENGTH, missing("summary"), errors);
-  const publishedAtUtc = typeof publishedAt === "string" ? toUtc(publishedAt) : undefined;
-  if (missing("publishedAt")) errors.push("publishedAt がありません");
-  else if (publishedAt !== undefined && publishedAtUtc === undefined) {
-    errors.push(`publishedAt をオフセット付きの ISO 8601 として読めません（例: 2026-10-10T09:00:00+09:00）: ${publishedAt}`);
-  }
-  if (typeof draft !== "boolean") errors.push("draft は true か false で書く");
-  if (typeof marp !== "boolean") errors.push("marp は true か false で書く");
-  if (marp !== true) {
-    const directives = keys.filter((key) => MARP_DIRECTIVE_KEYS.has(key));
-    if (directives.length > 0) errors.push(`${directives.join("、")} は Marp の記事（marp: true）にだけ書ける`);
-  }
-  // 型の絞り込みのための条件（errors が空なら、title と summary は文字列、publishedAtUtc はある）
-  if (errors.length > 0 || typeof title !== "string" || typeof summary !== "string" || publishedAtUtc === undefined) {
-    return errors.join(" / ");
-  }
-
-  // Marp の記事は、title など、作品の付帯情報、記事のタグを除いた frontmatter を本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）。
-  // yes / on などで書いた真偽値は true / false に書き直す
-  const kept = lines.flatMap((line) => {
+/**
+ * Marp の記事で本文の先頭に残す frontmatter の行。title など、作品の付帯情報、記事のタグを除く。
+ * yes / on などで書いた真偽値は true / false に書き直す
+ */
+function keepMarpFrontmatterLines(lines: string[], data: Record<string, FrontmatterValue>): string[] {
+  return lines.flatMap((line) => {
     const key = KEY_LINE.exec(line)?.[1];
     if (key !== undefined && (POST_KEYS.has(key) || WORK_KEYS.has(key) || key === TAGS_KEY)) return [];
     const value = key !== undefined && Object.hasOwn(data, key) ? data[key] : undefined;
     return typeof value === "boolean" ? [`${key}: ${value}`] : [line];
   });
-  const bodyMarkdown = marp === true ? [DELIMITER, ...kept, DELIMITER, body].join("\n") : body;
-  return {
-    slug,
-    title,
-    summary,
-    bodyMarkdown,
-    publishedAt: publishedAtUtc,
-    updatedAt: publishedAtUtc,
-    ...(draft === true ? { draft } : {}),
-    ...(tags !== undefined ? { tags } : {}),
-    ...workFields,
-  };
 }
 
 /**
@@ -421,15 +444,9 @@ function readWorkFields(data: Record<string, FrontmatterValue>, errors: string[]
     if (typeof badge === "string" && isWorkBadge(badge)) fields.badge = badge;
     else errors.push(`badge は ${WORK_BADGES.join("、")} のどれかで書く`);
   }
-  if (tech !== undefined) {
-    if (!Array.isArray(tech)) errors.push("tech は 1 行のリストで書く（例: tech: [TypeScript, Node.js]）");
-    else if (tech.length > MAX_TECH_ITEMS) errors.push(`tech は ${MAX_TECH_ITEMS} 個まで`);
-    else if (tech.some((item) => [...item].length > MAX_TECH_LENGTH)) errors.push(`tech の 1 個は ${MAX_TECH_LENGTH} 文字まで`);
-    else if (new Set(tech).size !== tech.length) errors.push("tech に同じ語が 2 回以上あります");
-    else fields.tech = tech;
-  }
+  fields.tech = readTech(tech, errors);
   if (repository !== undefined) {
-    if (typeof repository === "string" && REPOSITORY_URL.test(repository) && repository.length <= MAX_REPOSITORY_URL_LENGTH) {
+    if (isRepositoryUrl(repository)) {
       fields.repositoryUrl = repository;
     } else {
       errors.push(`repository は https の URL で書く（例: https://github.com/owner/repo。${MAX_REPOSITORY_URL_LENGTH} 文字まで）`);
@@ -437,6 +454,34 @@ function readWorkFields(data: Record<string, FrontmatterValue>, errors: string[]
   }
   if (badge === "oss" && repository === undefined) errors.push("badge: oss には repository が要る");
   return fields;
+}
+
+/** 作品の tech を読む。書いていないか問題があれば空。問題は errors に足す */
+function readTech(tech: FrontmatterValue | undefined, errors: string[]): string[] {
+  if (tech === undefined) return [];
+
+  if (!Array.isArray(tech)) {
+    errors.push("tech は 1 行のリストで書く（例: tech: [TypeScript, Node.js]）");
+    return [];
+  }
+
+  const problem = findTechProblem(tech);
+  if (problem === undefined) return tech;
+
+  errors.push(problem);
+  return [];
+}
+
+/** tech のリストの問題を 1 つ返す。問題が無ければ undefined */
+function findTechProblem(tech: string[]): string | undefined {
+  if (tech.length > MAX_TECH_ITEMS) return `tech は ${MAX_TECH_ITEMS} 個まで`;
+  if (tech.some((item) => [...item].length > MAX_TECH_LENGTH)) return `tech の 1 個は ${MAX_TECH_LENGTH} 文字まで`;
+  if (new Set(tech).size !== tech.length) return "tech に同じ語が 2 回以上あります";
+  return undefined;
+}
+
+function isRepositoryUrl(value: FrontmatterValue): value is string {
+  return typeof value === "string" && REPOSITORY_URL.test(value) && value.length <= MAX_REPOSITORY_URL_LENGTH;
 }
 
 function isWorkBadge(value: string): value is WorkBadge {
@@ -455,6 +500,17 @@ function checkText(
   else if (value === undefined) return;
   else if (typeof value !== "string" || BLANK.test(value)) errors.push(`${key} は空でない文字列で書く`);
   else if ([...value].length > maxLength) errors.push(`${key} は ${maxLength} 文字まで`);
+}
+
+/** publishedAt を UTC の ISO 文字列にする。読めなければ undefined。問題は errors に足す */
+function readPublishedAt(value: FrontmatterValue | undefined, missing: boolean, errors: string[]): string | undefined {
+  const utc = typeof value === "string" ? toUtc(value) : undefined;
+  if (missing) errors.push("publishedAt がありません");
+  else if (value !== undefined && utc === undefined) {
+    errors.push(`publishedAt をオフセット付きの ISO 8601 として読めません（例: 2026-10-10T09:00:00+09:00）: ${value}`);
+  }
+
+  return utc;
 }
 
 /** オフセット付きの ISO 8601 を UTC の ISO 文字列にする。暦に無い日時（2 月 30 日、24 時など）は undefined */
