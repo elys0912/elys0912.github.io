@@ -129,7 +129,7 @@ function postList(posts: readonly PostContent[]): string {
 
 /** 一覧のページの中身を、右にサイドバーを置いた 2 列で包む。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
 function withSidebar(content: string, posts: readonly PostContent[]): string {
-  return `<div${cls("Sidebar", "listLayout")}><div>${content}</div>${sidebar(posts)}</div>`;
+  return `<div${cls("Sidebar", "listLayout")}><div>${content}</div>${sidebar(posts, { showsRecentPosts: true })}</div>`;
 }
 
 /** 記事一覧の 1 件 */
@@ -154,6 +154,7 @@ function tagChips(tags: readonly string[] | undefined): string {
 
 /**
  * 記事の詳細ページ。右の列はサイドバーと、その下の目次（無い記事では出さない）。
+ * サイドバーから最近の記事を外す。1280×800 の画面で、記事を開いた時点で目次が画面に入るようにするため。
  * posts はサイドバーの部品に使う公開済みの全記事（新しい順）
  */
 export function postPage(post: PostContent, posts: readonly PostContent[], ctx: PageContext): string {
@@ -162,7 +163,7 @@ export function postPage(post: PostContent, posts: readonly PostContent[], ctx: 
   const hasToc = headings.length > 0;
 
   const aside = hasToc ? `<aside${cls("PostDetail", "aside")}>${tableOfContents(headings)}</aside>` : "";
-  const column = `<div${cls("Sidebar", "column")}>${sidebar(posts)}${aside}</div>`;
+  const column = `<div${cls("Sidebar", "column")}>${sidebar(posts, { showsRecentPosts: false })}${aside}</div>`;
   const body = isMarp ? marpDeck(post.bodyMarkdown, ctx.assets) : `<div${cls("PostDetail", "body")}>${html}</div>`;
   const backLabel = `${POST_LIST_TITLE}へ戻る`;
   const footer = `<footer${cls("PostDetail", "footer")}><p><a${cls("PostDetail", "back")} href="${HOME_PATH}">← ${escapeHtml(backLabel)}</a></p></footer>`;
@@ -215,10 +216,11 @@ function tableOfContents(headings: readonly Heading[]): string {
 
 /**
  * サイドバー。部品を上から順に並べる。部品を足すときは、区画を返す関数を作ってここに並べる。
- * posts は公開済みの全記事（新しい順）
+ * posts は公開済みの全記事（新しい順）。showsRecentPosts が false なら最近の記事の区画を出さない（記事ページ）
  */
-function sidebar(posts: readonly PostContent[]): string {
-  const sections = [profileSection(), recentPostsSection(posts), tagsSection(posts), monthsSection(posts)];
+function sidebar(posts: readonly PostContent[], { showsRecentPosts }: { showsRecentPosts: boolean }): string {
+  const recentPosts = showsRecentPosts ? recentPostsSection(posts) : "";
+  const sections = [profileSection(), recentPosts, tagsSection(posts), monthsSection(posts)];
 
   return `<aside${cls("Sidebar", "sidebar")} aria-label="サイドバー">${sections.join("")}</aside>`;
 }
