@@ -9,4 +9,4 @@
 
 2026-10-08 以前は CC BY-NC 4.0 で公開していた。その期間に取得した複製には、取得時の条件が引き続き適用される。
 
-リポジトリのコード（`app/`、`components/`、`lib/`、`scripts/` など）は [MIT License](../LICENSE)。
+リポジトリのコード（`src/`、`shared/`、`.github/` など）は [MIT License](../LICENSE)。

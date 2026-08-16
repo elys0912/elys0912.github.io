@@ -3,6 +3,12 @@
 const IMAGE_PATH = /^\/images\/([^/]+)\/([^/]+)$/;
 
 /**
+ * デコードした後の slug とファイル名に含めない文字。\ と : は Windows の path.join で区切りやドライブになり、
+ * content/images/ の外を指しうる（%5C は decodeURI で \ に戻る）。ほかは Windows のファイル名に使えない文字と制御文字
+ */
+const UNSAFE_IMAGE_PATH_CHAR = /[\\:*?"<>|\x00-\x1f\x7f]/;
+
+/**
  * 本文の Markdown（frontmatter を含むファイルの中身）が参照する、content/images/ の下の画像の "<slug>/<ファイル名>"。
  * 拾うのは ![…](…)、参照形式の ![…][…]、<img src="…">。フェンスのコードブロック、インラインのコード、
  * HTML のコメントの中は表示されないため拾わない。
@@ -62,6 +68,8 @@ function imageKeyOf(src: string): string | undefined {
   if (!match || match[1] === "." || match[1] === ".." || match[2] === "." || match[2] === ".." || /[?#]/.test(decoded)) {
     return undefined;
   }
+  // 拾わなかった参照は、書き出した後の checkSiteResources（src/build.ts）で out/ に無いものとしてビルドを止める
+  if (UNSAFE_IMAGE_PATH_CHAR.test(decoded)) return undefined;
   return `${match[1]}/${match[2]}`;
 }
 
