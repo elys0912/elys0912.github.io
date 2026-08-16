@@ -365,6 +365,8 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
 /**
  * 記事のタグを読む。書いていなければ undefined。問題は errors に足す。
  * 1 行のリストで 1〜MAX_TAGS 個、1 個 MAX_TAG_LENGTH 文字まで、TAG_FORBIDDEN の文字を含まない、同じタグは 1 回だけ。
+ * 各タグは NFC に正規化してから検査し、正規化した値を返す。見た目が同じで文字コードが違うタグ（NFC と NFD）を、
+ * 同じ文字数で数え、同じタグとして比べるため（例: NFD の「が」は 2 文字ではなく 1 文字と数える）。
  * 空のリストと空の要素は parseFrontmatter がエラーにする。ブロックで書いたキーは data に入らない（呼び出し側でエラーにしてある）。
  */
 function readTags(data: Record<string, FrontmatterValue>, errors: string[]): string[] | undefined {
@@ -376,14 +378,15 @@ function readTags(data: Record<string, FrontmatterValue>, errors: string[]): str
     return undefined;
   }
 
-  const problem = findTagsProblem(tags);
-  if (problem === undefined) return tags;
+  const normalizedTags = tags.map((tag) => tag.normalize("NFC"));
+  const problem = findTagsProblem(normalizedTags);
+  if (problem === undefined) return normalizedTags;
 
   errors.push(problem);
   return undefined;
 }
 
-/** タグの並びの問題を 1 つ返す。問題が無ければ undefined */
+/** NFC に正規化したタグの並びの問題を 1 つ返す。問題が無ければ undefined */
 function findTagsProblem(tags: string[]): string | undefined {
   if (tags.length > MAX_TAGS) return `tags は ${MAX_TAGS} 個まで`;
   if (tags.some((tag) => [...tag].length > MAX_TAG_LENGTH)) return `tags の 1 個は ${MAX_TAG_LENGTH} 文字まで`;
