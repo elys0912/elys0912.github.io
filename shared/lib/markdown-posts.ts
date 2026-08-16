@@ -73,11 +73,12 @@ const MAX_TITLE_LENGTH = 200;
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TECH_ITEMS = 10;
 const MAX_TECH_LENGTH = 40;
-const MAX_TAGS = 5;
-/** タグ 1 個の長さの上限。作品の tech の 1 個と同じ */
-const MAX_TAG_LENGTH = MAX_TECH_LENGTH;
-/** タグに使えない文字。空白（全角を含む）、, と / */
-const TAG_FORBIDDEN = /[\s,/]/u;
+/** 1 記事のタグの個数の上限。ブログの記事一覧の検査でも使うため export する */
+export const MAX_TAGS = 5;
+/** タグ 1 個の長さの上限。作品の tech の 1 個と同じ。ブログの記事一覧の検査でも使うため export する */
+export const MAX_TAG_LENGTH = MAX_TECH_LENGTH;
+/** タグに使えない文字。空白（全角を含む）、, と /。g フラグを付けない（test が lastIndex を持ち越さないため） */
+export const TAG_FORBIDDEN = /[\s,/]/u;
 const MAX_REPOSITORY_URL_LENGTH = 500;
 /** repository の形。https で、ホスト名（ドットを含む）の後に、空白を含まない ASCII のパスを置ける（ContentLoader と同じ） */
 const REPOSITORY_URL = /^https:\/\/[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:\/[!-~]*)?$/;
