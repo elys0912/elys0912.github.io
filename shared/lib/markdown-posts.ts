@@ -356,7 +356,7 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
 /** UTF-8 として読む。読めなければ undefined */
 function decodeUtf8(bytes: Uint8Array): string | undefined {
   try {
-    // BOM は parseFrontmatter が 1 つだけ取り除く（ここでも取り除くと、BOM が 2 つあるファイルを読めてしまう）
+    // BOM は parseFrontmatter が 1 つだけ取り除く（ここでも取り除くと、BOM が 2 つあるファイルを読める）
     return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     return undefined;
