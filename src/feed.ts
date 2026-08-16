@@ -12,7 +12,10 @@ import {
   postPath,
   SITE_DESCRIPTION,
   SITE_NAME,
+  TAG_INDEX_PATH,
+  tagPath,
 } from "./site.ts";
+import { groupPostsByTag, type TagArchive } from "./tags.ts";
 
 /** フィードに載せる記事の数 */
 export const FEED_ENTRY_LIMIT = 20;
@@ -73,8 +76,8 @@ function toRfc3339(value: string): string {
 }
 
 /**
- * sitemap.xml。トップページ（記事があれば最新の更新日時を付ける）、記事のページ、月別の一覧ページ。
- * 月別の一覧ページの lastmod は、その月の記事の最新の更新日時
+ * sitemap.xml。トップページ（記事があれば最新の更新日時を付ける）、記事のページ、月別の一覧ページ、タグの一覧ページ。
+ * 月別とタグの一覧ページの lastmod は、載せる記事の最新の更新日時
  */
 export function buildSitemap(posts: readonly PostContent[]): string {
   const entries = posts.map((post) => ({ url: absoluteUrl(postPath(post.slug)), lastModified: post.updatedAt }));
@@ -83,7 +86,7 @@ export function buildSitemap(posts: readonly PostContent[]): string {
     url: absoluteUrl(archivePath(archive.month)),
     lastModified: latest(archive.posts.map((post) => post.updatedAt)),
   }));
-  const urls = [home, ...entries, ...archives].map(({ url, lastModified }) => {
+  const urls = [home, ...entries, ...archives, ...tagEntries(groupPostsByTag(posts))].map(({ url, lastModified }) => {
     const lastmod = lastModified === undefined ? [] : [element("lastmod", lastModified)];
 
     return ["<url>", element("loc", url), ...lastmod, "</url>"].join("\n");
@@ -96,6 +99,22 @@ export function buildSitemap(posts: readonly PostContent[]): string {
     `</urlset>`,
     "",
   ].join("\n");
+}
+
+/**
+ * タグの一覧（/tags/）とタグごとの一覧のページ。タグが 1 つも無ければ載せない（/tags/ は中身の無いページのため）。
+ * /tags/ の lastmod は、タグの付いた記事の最新の更新日時
+ */
+function tagEntries(tags: readonly TagArchive[]): { url: string; lastModified: string | undefined }[] {
+  if (tags.length === 0) return [];
+
+  const tagPages = tags.map((archive) => ({
+    url: absoluteUrl(tagPath(archive.tag)),
+    lastModified: latest(archive.posts.map((post) => post.updatedAt)),
+  }));
+  const index = { url: absoluteUrl(TAG_INDEX_PATH), lastModified: latest(tagPages.flatMap((page) => page.lastModified ?? [])) };
+
+  return [index, ...tagPages];
 }
 
 /** いちばん新しい日時。空なら undefined（記事が無ければ、トップページの lastmod は省く） */

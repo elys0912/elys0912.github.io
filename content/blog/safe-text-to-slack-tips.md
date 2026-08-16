@@ -2,6 +2,7 @@
 title: "Slack に安全にテキストを流す Tips"
 summary: Claude の返信やコマンドの中身を Slack に投稿するときに踏んだ落とし穴と、その対処を短くまとめた。分割送信でサロゲートペアを切らない、リンクの展開を止める、mrkdwn をメンションの形に限る、ログのトークンを伏せるなど。
 publishedAt: 2026-10-02T21:00:00+09:00
+tags: [claude-slack-channel, security]
 ---
 
 # はじめに

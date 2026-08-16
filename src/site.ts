@@ -21,7 +21,10 @@ export const POST_LIST_LEAD = SITE_DESCRIPTION;
 export const POST_LIST_EMPTY_TEXT = "なんもない";
 
 /** ヘッダーのナビの項目。href は末尾を / にしたサイト内のパス */
-export const NAV_ITEMS: readonly { href: string; label: string }[] = [{ href: "/", label: POST_LIST_TITLE }];
+export const NAV_ITEMS: readonly { href: string; label: string }[] = [
+  { href: "/", label: POST_LIST_TITLE },
+  { href: "/tags/", label: "タグ" },
+];
 
 /** サイドバーのプロフィールの一言（仮。サイトの説明と同じ文） */
 export const PROFILE_BIO = SITE_DESCRIPTION;
@@ -45,6 +48,23 @@ export function archiveTitle(month: string): string {
 
 export function archiveDescription(month: string): string {
   return `${month} に公開した記事の一覧`;
+}
+
+/**
+ * タグの見出し。サイドバーの区画、記事のチップの aria-label にも使う。
+ * タグの一覧ページ（/tags/）は見出し（<title> にも使う）と説明、タグが 1 つも無いときの文言
+ */
+export const TAGS_TITLE = "タグ";
+export const TAG_INDEX_DESCRIPTION = "記事に付けたタグの一覧";
+export const TAG_INDEX_EMPTY_TEXT = "まだタグがない";
+
+/** タグごとの一覧ページの見出し（<title> にも使う）と説明 */
+export function tagTitle(tag: string): string {
+  return `${TAGS_TITLE}: ${tag}`;
+}
+
+export function tagDescription(tag: string): string {
+  return `タグ「${tag}」を付けた記事の一覧`;
 }
 
 /** フッターの著作権の表示の後ろに置くリンク（仮）。記事のライセンスを案内する */
@@ -100,6 +120,14 @@ export function archivePath(month: string): string {
   const [year, monthNumber] = month.split("-");
 
   return `/archive/${year}/${monthNumber}/`;
+}
+
+/** タグの一覧ページ */
+export const TAG_INDEX_PATH = "/tags/";
+
+/** タグごとの一覧ページ（/tags/<タグ>/）。タグは encodeURIComponent（日本語も %E3… になる） */
+export function tagPath(tag: string): string {
+  return `${TAG_INDEX_PATH}${encodeURIComponent(tag)}/`;
 }
 
 /** サイト内のパスを絶対 URL にする */

@@ -2,6 +2,7 @@
 title: "GitHub Actions から OIDC で AWS にデプロイする"
 summary: "長期のアクセスキーを置かずに、GitHub Actions から OIDC で AWS のロールを引き受けてデプロイする。信頼ポリシーの sub を不変の形式に合わせた話、id-token: write をデプロイのジョブだけに絞ってテストで検査する話、GitHub Free の private リポジトリでは Environments が使えない話。"
 publishedAt: 2026-09-24T21:00:00+09:00
+tags: [aws, ci-cd, security, portfolio]
 ---
 
 # はじめに

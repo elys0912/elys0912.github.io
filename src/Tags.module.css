@@ -1,0 +1,21 @@
+/*
+ * タグのチップ。枠と文字の大きさは PostList.module.css の .chips（同じ ul に両方の class を付ける）。
+ * ここはチップの中のリンクの指定だけ。.chips li の指定は上書きしない（css.ts は結合の順に意味を持たせないため）。
+ */
+
+/* 記事一覧のカードでは、タイトルのリンクの ::after がカード全体を覆う。チップのリンクはその上に出す */
+.chips a {
+  position: relative;
+  z-index: 1;
+  color: inherit;
+  text-decoration: none;
+}
+
+.chips a:hover {
+  color: var(--yellow);
+}
+
+/* タグの一覧ページ（/tags/）。カードの中のチップより文字を大きくする */
+.index a {
+  font-size: 0.875rem;
+}

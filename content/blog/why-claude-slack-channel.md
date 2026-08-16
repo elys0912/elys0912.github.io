@@ -2,6 +2,7 @@
 title: "なぜ作ったか：Slack の DM から手元の Claude Code を動かす"
 summary: 手元の PC で動いている Claude Code のセッションに、Slack から話しかけるための MCP channel サーバーを作った。最初の実装からチャンネル対応、ホームタブ、複数セッションまでの 4 日間と、自分の困りごとから生まれた経緯を書く。
 publishedAt: 2026-10-01T21:00:00+09:00
+tags: [claude-slack-channel, claude-code, windows]
 ---
 
 # はじめに

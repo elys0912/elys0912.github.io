@@ -1,6 +1,7 @@
-// ページの HTML。トップ（記事一覧）、月別の一覧、記事、404 と、共通の <head>、ヘッダー、フッター。
+// ページの HTML。トップ（記事一覧）、月別の一覧、タグの一覧とタグごとの一覧、記事、404 と、共通の <head>、ヘッダー、フッター。
 // HTML の構造と class 名は portfolio（Next.js の React コンポーネント）が出すものにそろえる。
-// 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠。
+// 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠、
+// タグのチップのリンク（src/Tags.module.css）。
 // class 名は css.ts が書き換えた名前を classOf で引く。CSS に無い class は、CSS Modules と同じく属性ごと出さない。
 // 文字は escapeHtml を通す。本文の HTML は shared/lib/markdown.ts が許可リストでサニタイズ済み。
 // Marp の HTML は shared/lib/marp.ts が html: false（生の HTML はエスケープ）で変換済み。この 2 つはそのまま埋め込む。
@@ -34,7 +35,15 @@ import {
   RECENT_POSTS_COUNT,
   SITE_DESCRIPTION,
   SITE_NAME,
+  TAG_INDEX_DESCRIPTION,
+  TAG_INDEX_EMPTY_TEXT,
+  TAG_INDEX_PATH,
+  tagDescription,
+  tagPath,
+  TAGS_TITLE,
+  tagTitle,
 } from "./site.ts";
+import { groupPostsByTag, type TagArchive } from "./tags.ts";
 
 /** ページの <head> と本文の外側（CSS とスクリプトの URL）に使う、out/ の中のファイルの URL（?v= 付き） */
 export type Assets = { css: string; script: string; marpScript: string };
@@ -74,9 +83,40 @@ export function archivePage(archive: MonthArchive, posts: readonly PostContent[]
   return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
 }
 
-/** 記事一覧の見出しと件数 */
-function postListHeading(title: string, count: number): string {
-  return `<div${cls("PostList", "heading")}><h1>${escapeHtml(title)}</h1><p${cls("PostList", "count")}>${count} 件</p></div>`;
+/** タグの一覧ページ（/tags/）。タグと記事の件数を、記事の多い順に並べる。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
+export function tagIndexPage(posts: readonly PostContent[], ctx: PageContext): string {
+  const tags = groupPostsByTag(posts);
+  const heading = postListHeading(TAGS_TITLE, tags.length, "個");
+  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(TAG_INDEX_DESCRIPTION)}</p>`;
+  const list = tags.length === 0 ? `<p${cls("PostList", "empty")}>${escapeHtml(TAG_INDEX_EMPTY_TEXT)}</p>` : tagIndexList(tags);
+  const head = { title: TAGS_TITLE, description: TAG_INDEX_DESCRIPTION, path: TAG_INDEX_PATH };
+
+  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+}
+
+/** タグの一覧。チップと同じ見た目で、文字を大きくする */
+function tagIndexList(tags: readonly TagArchive[]): string {
+  const items = tags.map(({ tag, posts }) => `<li><a href="${escapeHtml(tagPath(tag))}">${escapeHtml(tag)} (${posts.length})</a></li>`);
+  const listClass = classList(["PostList", "chips"], ["Tags", "chips"], ["Tags", "index"]);
+
+  return `<ul${attr("class", listClass)}>${items.join("")}</ul>`;
+}
+
+/** タグごとの一覧ページ。見た目は月別の一覧ページと同じ。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
+export function tagPage(archive: TagArchive, posts: readonly PostContent[], ctx: PageContext): string {
+  const title = tagTitle(archive.tag);
+  const description = tagDescription(archive.tag);
+  const heading = postListHeading(title, archive.posts.length);
+  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(description)}</p>`;
+  const list = postList(archive.posts);
+  const head = { title, description, path: tagPath(archive.tag) };
+
+  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+}
+
+/** 記事一覧の見出しと件数。unit は件数の単位 */
+function postListHeading(title: string, count: number, unit = "件"): string {
+  return `<div${cls("PostList", "heading")}><h1>${escapeHtml(title)}</h1><p${cls("PostList", "count")}>${count} ${unit}</p></div>`;
 }
 
 /** 記事一覧。記事が無いときは POST_LIST_EMPTY_TEXT */
@@ -98,11 +138,21 @@ function postCard(post: PostContent): string {
   const summary = `<p${cls("PostList", "summary")}>${escapeHtml(post.summary)}</p>`;
   const date = `<time datetime="${escapeHtml(post.publishedAt)}"${cls("PostList", "date")}>${formatDate(post.publishedAt)}</time>`;
 
-  return `<li${attr("class", cardClass)}><div${cls("PostList", "main")}>${title}${summary}</div>${date}</li>`;
+  return `<li${attr("class", cardClass)}><div${cls("PostList", "main")}>${title}${summary}${tagChips(post.tags)}</div>${date}</li>`;
+}
+
+/** 記事のタグのチップ。各タグの一覧ページへのリンク。タグが無い記事では出さない */
+function tagChips(tags: readonly string[] | undefined): string {
+  if (tags === undefined || tags.length === 0) return "";
+
+  const items = tags.map((tag) => `<li><a href="${escapeHtml(tagPath(tag))}">${escapeHtml(tag)}</a></li>`);
+  const listClass = classList(["PostList", "chips"], ["Tags", "chips"]);
+
+  return `<ul${attr("class", listClass)} aria-label="${escapeHtml(TAGS_TITLE)}">${items.join("")}</ul>`;
 }
 
 /**
- * 記事の詳細ページ。右の列は目次（無い記事では出さない）とサイドバー。
+ * 記事の詳細ページ。右の列はサイドバーと、その下の目次（無い記事では出さない）。
  * posts はサイドバーの部品に使う公開済みの全記事（新しい順）
  */
 export function postPage(post: PostContent, posts: readonly PostContent[], ctx: PageContext): string {
@@ -111,7 +161,7 @@ export function postPage(post: PostContent, posts: readonly PostContent[], ctx: 
   const hasToc = headings.length > 0;
 
   const aside = hasToc ? `<aside${cls("PostDetail", "aside")}>${tableOfContents(headings)}</aside>` : "";
-  const column = `<div${cls("Sidebar", "column")}>${aside}${sidebar(posts)}</div>`;
+  const column = `<div${cls("Sidebar", "column")}>${sidebar(posts)}${aside}</div>`;
   const body = isMarp ? marpDeck(post.bodyMarkdown, ctx.assets) : `<div${cls("PostDetail", "body")}>${html}</div>`;
   const backLabel = `${POST_LIST_TITLE}へ戻る`;
   const footer = `<footer${cls("PostDetail", "footer")}><p><a${cls("PostDetail", "back")} href="${HOME_PATH}">← ${escapeHtml(backLabel)}</a></p></footer>`;
@@ -122,13 +172,13 @@ export function postPage(post: PostContent, posts: readonly PostContent[], ctx: 
   return page(ctx, { title: post.title, description: post.summary, path: postPath(post.slug), article }, main);
 }
 
-/** 記事の冒頭（パンくずリスト、公開日と更新日、タイトル、概要） */
+/** 記事の冒頭（パンくずリスト、公開日と更新日、タイトル、概要、タグ） */
 function postHeader(post: PostContent): string {
   const breadcrumb = `<nav aria-label="パンくずリスト"><ol${cls("PostDetail", "breadcrumb")}><li><a href="${HOME_PATH}">${escapeHtml(POST_LIST_TITLE)}</a></li><li aria-current="page">${escapeHtml(post.title)}</li></ol></nav>`;
   const title = `<h1${cls("PostDetail", "title")}>${escapeHtml(post.title)}</h1>`;
   const summary = `<p${cls("PostDetail", "summary")}>${escapeHtml(post.summary)}</p>`;
 
-  return `<header${cls("PostDetail", "header")}>${breadcrumb}${postDates(post)}${title}${summary}</header>`;
+  return `<header${cls("PostDetail", "header")}>${breadcrumb}${postDates(post)}${title}${summary}${tagChips(post.tags)}</header>`;
 }
 
 function postDates(post: PostContent): string {
@@ -167,7 +217,7 @@ function tableOfContents(headings: readonly Heading[]): string {
  * posts は公開済みの全記事（新しい順）
  */
 function sidebar(posts: readonly PostContent[]): string {
-  const sections = [profileSection(), recentPostsSection(posts), monthsSection(posts)];
+  const sections = [profileSection(), recentPostsSection(posts), tagsSection(posts), monthsSection(posts)];
 
   return `<aside${cls("Sidebar", "sidebar")} aria-label="サイドバー">${sections.join("")}</aside>`;
 }
@@ -200,6 +250,20 @@ function recentPostsSection(posts: readonly PostContent[]): string {
   return sidebarSection("最近の記事", `<ul${cls("Sidebar", "recent")}>${items.join("")}</ul>`);
 }
 
+/** タグ（タグと件数。記事の多い順）。各タグの一覧ページへのリンク。タグが 1 つも無ければ区画を出さない */
+function tagsSection(posts: readonly PostContent[]): string {
+  const tags = groupPostsByTag(posts);
+  if (tags.length === 0) return "";
+
+  const items = tags.map(({ tag, posts: tagPosts }) => {
+    const link = `<a href="${escapeHtml(tagPath(tag))}">${escapeHtml(tag)}</a>`;
+
+    return `<li>${link} <span${cls("Sidebar", "tagCount")}>(${tagPosts.length})</span></li>`;
+  });
+
+  return sidebarSection(TAGS_TITLE, `<ul${cls("Sidebar", "tags")}>${items.join("")}</ul>`);
+}
+
 /** 月別（年月と件数。新しい順）。各月の一覧ページへのリンク */
 function monthsSection(posts: readonly PostContent[]): string {
   const items = groupPostsByMonth(posts).map(({ month, posts: monthPosts }) => {
@@ -229,7 +293,7 @@ function page({ assets, now }: PageContext, head: HeadOptions, main: string): st
 function headTags({ title, description, path, article, noindex }: HeadOptions, assets: Assets): string {
   // <title> と og:title はどちらも「タイトル | サイト名」。タイトルが無いページ（トップ）はサイト名だけ
   const fullTitle = title ? `${title} | ${SITE_NAME}` : SITE_NAME;
-  // og:title は、ページのメタデータを持つページ（トップ、月別の一覧、記事）だけがタイトル入り。404 はサイト名（Next.js 版と同じ）
+  // og:title は、ページのメタデータを持つページ（トップ、月別とタグの一覧、記事）だけがタイトル入り。404 はサイト名（Next.js 版と同じ）
   const ogTitle = path !== undefined ? fullTitle : SITE_NAME;
   const url = path !== undefined ? absoluteUrl(path) : undefined;
   const image = absoluteUrl(OG_IMAGE.path);
@@ -325,6 +389,13 @@ function siteFooter(now: Date): string {
   const backButton = `${attr("data-back-label", HISTORY_BACK_LABEL)}${attr("data-back-class", classOf("FooterBackButton", "button"))}`;
 
   return `<footer${cls("SiteFooter", "footer")}><p${cls("SiteFooter", "inner")}${backButton}>© ${year} ${escapeHtml(AUTHOR_NAME)}${links.join("")}</p></footer>`;
+}
+
+/** 複数の class をまとめた class 属性の値（CSS に無い class は外す。1 つも無ければ undefined） */
+function classList(...names: readonly [ModuleName, string][]): string | undefined {
+  const classes = names.map(([module, name]) => classOf(module, name)).filter((name) => name !== undefined);
+
+  return classes.length === 0 ? undefined : classes.join(" ");
 }
 
 /** class 属性（CSS に無い class なら出さない） */

@@ -2,6 +2,7 @@
 title: "Windows のコンソールを外から操作する"
 summary: Slack からターミナルの画面を読み、選択肢を選び、/exit を打ち込むために PowerShell スクリプトを書いた。別のコンソールで画面が読めない、複数キーが届かない、文字化けで文言が一致しないなど、泥臭い問題を順に解いた記録。
 publishedAt: 2026-10-04T09:00:00+09:00
+tags: [claude-slack-channel, claude-code, windows]
 ---
 
 # はじめに

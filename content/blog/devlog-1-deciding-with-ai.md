@@ -2,6 +2,7 @@
 title: "devlog #1：AI と壁打ちしながら設計を決める"
 summary: ポートフォリオサイトの設計は、AI（Claude Code）に判断材料を集めさせて、決めるのは自分。決定メモの型と、3 件まとめて決めた話、AI の説明を公式ドキュメントで裏を取った話。
 publishedAt: 2026-10-07T09:00:00+09:00
+tags: [claude-code, portfolio, design]
 ---
 
 # はじめに
