@@ -7,7 +7,7 @@ tags: [spring-boot, aws, portfolio]
 
 # 構成
 
-このサイトの API は、CloudFront → API Gateway HTTP API → Lambda（Java 21、arm64、SnapStart）→ Aurora DSQL という経路で動いている。常時課金されるものは作らない。作業は AI（Claude Code）と壁打ちしながら進めたが、方式の選択と失敗の原因の確認は自分でやった。
+このサイトの API は、CloudFront → API Gateway HTTP API → Lambda（Java 21、arm64、SnapStart）→ Aurora DSQL という経路で動いている。常時課金されるものは作らない。作業は AI（Claude Code）と壁打ちしながら進めたが、方式の選択はこっちで決め、失敗の原因もこっちで確かめた。
 
 # ハンドラと zip
 
@@ -17,7 +17,7 @@ zip は fat jar ではなく assembly 方式にした。クラスを zip の直�
 
 ## tomcat-embed-el を外して壊れた
 
-この除外で 1 回壊した。パターンを `tomcat-embed-*` と書いたため、tomcat-embed-el まで消えた。Hibernate Validator は Jakarta EL の実装が要るので、Lambda の INIT で `ClassNotFoundException`。ローカルでは組み込み Tomcat が EL の実装を持っているから、発覚しないんだよな。除外を `tomcat-embed-core-*` と `tomcat-embed-websocket-*` に絞った。
+この除外で 1 回壊した。パターンを `tomcat-embed-*` と書いたため、tomcat-embed-el まで消えた。Hibernate Validator は Jakarta EL の実装が必要なので、Lambda の INIT で `ClassNotFoundException`。ローカルでは組み込み Tomcat が EL の実装を持っているため、発覚しなかった。除外を `tomcat-embed-core-*` と `tomcat-embed-websocket-*` に絞った。
 
 # SnapStart のフック
 
@@ -38,7 +38,7 @@ SnapStart は INIT の後にスナップショットを取り、呼び出しの�
 
 初回デプロイで、この Lambda が失敗した。原因は `GRANT USAGE ON SCHEMA public TO app`。DSQL では public スキーマがシステムのエンティティとして扱われ、SQLSTATE 0A000 で失敗する。PUBLIC には USAGE が最初から付いているので、この GRANT はそもそも要らなかったんだよな。`has_schema_privilege` で足りないときだけ付けるようにした。
 
-原因にたどり着くまでがマジで長かった。Lambda の Java ランタイムはエラー応答に cause を載せないので、応答は "Migration failed" だけ。例外のメッセージに原因の連鎖と SQLSTATE を入れ、ロググループはロールバックしても残るようにした。
+原因にたどり着くまでがかなり長かった。Lambda の Java ランタイムはエラー応答に cause を載せないので、応答は "Migration failed" だけ。そこで、例外のメッセージに原因の連鎖と SQLSTATE を入れ、ロググループはロールバックしても残るようにした。
 
 # DSQL の癖
 
@@ -55,6 +55,6 @@ PostgreSQL 互換とはいえ、DDL で引っかかる点がある。公式ド�
 
 # AI との付き合い方
 
-フックの登録順や DSQL の制約は、AI の説明だけじゃ信用せず、ドキュメントと実際のデプロイで確かめた。GRANT も tomcat-embed-el も、AI と一緒に書いたコードが本番の Lambda で初めて壊れた。ローカルで通ることと Lambda で動くことは別。失敗の原因を追えるログを先に用意しておくのが、やっぱいちばん効いた。
+フックの登録順や DSQL の制約は、AI の説明だけでは信用せず、ドキュメントと実際のデプロイで確かめた。GRANT も tomcat-embed-el も、AI と一緒に書いたコードが本番の Lambda で初めて壊れた。ローカルで通ることと Lambda で動くことは別。失敗の原因を追えるログを先に用意しておくのが、やはりいちばん効いた。
 
 次回は、GitHub Actions から OIDC で AWS にデプロイする話を書く予定。

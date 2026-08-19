@@ -9,7 +9,7 @@ tags: [ci-cd, portfolio]
 
 このサイトのリポジトリは backend（Maven）、frontend（npm）、infra（npm）、GitHub Actions の 4 つの依存関係を持つ。Dependabot を全部に入れている。個人開発なので、PR を見るのは自分 1 人。放っておくと PR が溜まるので、運用を決めた。
 
-作業は AI（Claude Code）と壁打ちしながら進めている。どの PR を先に入れるかは自分で決める。
+作業は AI（Claude Code）と壁打ちしながら進めている。どの PR を先に入れるかは、こっちで決める。
 
 # 設定
 
@@ -49,11 +49,11 @@ major の更新はいくつか止めている。理由はコメントに書い�
 
 # mvnw.cmd が CRLF で入った
 
-Maven wrapper の更新（apache-maven 3.9.16 → 3.10.0）の PR は、`mvnw.cmd` を 378 行まるごと置き換えていた。マージした後、手元で checkout すると `mvnw.cmd` に差分が出続けるようになった。何も触ってないのに。
+Maven wrapper の更新（apache-maven 3.9.16 → 3.10.0）の PR は、`mvnw.cmd` を 378 行まるごと置き換えていた。マージした後、手元で checkout すると `mvnw.cmd` に差分が出続けるようになった。何も触っていないのに。
 
-原因は改行コード。`.gitattributes` で `*.cmd` は `text eol=crlf` と定めている。これは「リポジトリの中（blob）は LF で持ち、作業ツリーでは CRLF にする」という意味。ところが Dependabot が入れた blob は CRLF のままだった。Git は checkout のたびに正規化しようとして、差分が出る。
+原因は改行コード。`.gitattributes` で `*.cmd` は `text eol=crlf` と定めている。これは「リポジトリの中（blob）は LF で持ち、作業ツリーでは CRLF にする」という意味。ところが Dependabot が入れた blob は CRLF のままだった。Git が checkout のたびに正規化しようとするため、差分が出る。
 
-直し方は、blob を LF に正規化してコミットし直すこと。作業ツリーでは属性により CRLF になる。ほかのファイルには触らない。Dependabot の PR は中身を読まずにマージしがちだけど、Windows 用のスクリプトみたいに改行が意味を持つファイルは、diff の行数が多いときに一度はちゃんと確かめた方がいい。
+直し方は、blob を LF に正規化してコミットし直すこと。作業ツリーでは属性により CRLF になる。ほかのファイルには触らない。Dependabot の PR は中身を読まずにマージしがちだが、Windows 用のスクリプトみたいに改行が意味を持つファイルは、diff の行数が多いときに一度はちゃんと確かめた方がいい。
 
 # 今のところの運用
 
