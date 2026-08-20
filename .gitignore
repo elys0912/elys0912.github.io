@@ -3,6 +3,11 @@
 
 # build output
 /out/
+/.next/
+
+# next.js
+next-env.d.ts
+*.tsbuildinfo
 
 # misc
 .DS_Store
