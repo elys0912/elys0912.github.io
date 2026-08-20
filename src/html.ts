@@ -64,35 +64,30 @@ type HeadOptions = {
 
 /** トップページ（記事一覧） */
 export function homePage(posts: readonly PostContent[], ctx: PageContext): string {
+  const head = { description: SITE_DESCRIPTION, path: HOME_PATH };
   const heading = postListHeading(POST_LIST_TITLE, posts.length);
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(POST_LIST_LEAD)}</p>`;
-  const list = postList(posts);
 
-  return page(ctx, { description: SITE_DESCRIPTION, path: HOME_PATH }, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: POST_LIST_LEAD, list: postList(posts) }, posts);
 }
 
 /** 月別の一覧ページ。見た目はトップと同じ部品。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
 export function archivePage(archive: MonthArchive, posts: readonly PostContent[], ctx: PageContext): string {
   const title = archiveTitle(archive.month);
   const description = archiveDescription(archive.month);
-  const heading = postListHeading(title, archive.posts.length);
-  // 説明文は見出しと一覧のあいだの余白も兼ねる（PostList の .lead の margin）
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(description)}</p>`;
-  const list = postList(archive.posts);
   const head = { title, description, path: archivePath(archive.month) };
+  const heading = postListHeading(title, archive.posts.length);
 
-  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: description, list: postList(archive.posts) }, posts);
 }
 
 /** タグの一覧ページ（/tags/）。タグと記事の件数を、記事の多い順に並べる。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
 export function tagIndexPage(posts: readonly PostContent[], ctx: PageContext): string {
   const tags = groupPostsByTag(posts);
-  const heading = postListHeading(TAGS_TITLE, tags.length, "個");
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(TAG_INDEX_DESCRIPTION)}</p>`;
-  const list = tags.length === 0 ? `<p${cls("PostList", "empty")}>${escapeHtml(TAG_INDEX_EMPTY_TEXT)}</p>` : tagIndexList(tags);
   const head = { title: TAGS_TITLE, description: TAG_INDEX_DESCRIPTION, path: TAG_INDEX_PATH };
+  const heading = postListHeading(TAGS_TITLE, tags.length, "個");
+  const list = tags.length === 0 ? `<p${cls("PostList", "empty")}>${escapeHtml(TAG_INDEX_EMPTY_TEXT)}</p>` : tagIndexList(tags);
 
-  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: TAG_INDEX_DESCRIPTION, list }, posts);
 }
 
 /** タグの一覧。チップと同じ見た目で、文字を大きくする */
@@ -107,12 +102,21 @@ function tagIndexList(tags: readonly TagArchive[]): string {
 export function tagPage(archive: TagArchive, posts: readonly PostContent[], ctx: PageContext): string {
   const title = tagTitle(archive.tag);
   const description = tagDescription(archive.tag);
-  const heading = postListHeading(title, archive.posts.length);
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(description)}</p>`;
-  const list = postList(archive.posts);
   const head = { title, description, path: tagPath(archive.tag) };
+  const heading = postListHeading(title, archive.posts.length);
 
-  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: description, list: postList(archive.posts) }, posts);
+}
+
+/** 一覧のページの中身。heading は postListHeading、lead は説明文（エスケープ前）、list は一覧の HTML */
+type ListPageBody = { heading: string; lead: string; list: string };
+
+/** 一覧のページ（トップ、月別、タグの一覧、タグごと）。見出し・説明文・一覧を、右にサイドバーを置いた 2 列で包む */
+function listPage(ctx: PageContext, head: HeadOptions, { heading, lead, list }: ListPageBody, posts: readonly PostContent[]): string {
+  // 説明文は見出しと一覧のあいだの余白も兼ねる（PostList の .lead の margin）
+  const leadHtml = `<p${cls("PostList", "lead")}>${escapeHtml(lead)}</p>`;
+
+  return page(ctx, head, withSidebar(`${heading}${leadHtml}${list}`, posts));
 }
 
 /** 記事一覧の見出しと件数。unit は件数の単位 */
