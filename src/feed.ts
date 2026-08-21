@@ -76,37 +76,47 @@ function toRfc3339(value: string): string {
   return new Date(value).toISOString();
 }
 
+/** sitemap.xml の url 要素 1 つ分。lastModified が undefined なら lastmod を出さない */
+type SitemapEntry = { url: string; lastModified: string | undefined };
+
 /**
  * sitemap.xml。トップページ（記事があれば最新の更新日時を付ける）、記事のページ、月別の一覧ページ、タグの一覧ページ。
  * 月別とタグの一覧ページの lastmod は、載せる記事の最新の更新日時
  */
 export function buildSitemap(posts: readonly PostContent[]): string {
-  const entries = posts.map((post) => ({ url: absoluteUrl(postPath(post.slug)), lastModified: post.updatedAt }));
-  const home = { url: absoluteUrl(HOME_PATH), lastModified: latest(entries.map((entry) => entry.lastModified)) };
+  return [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
+    ...sitemapEntries(posts).map(urlElement),
+    `</urlset>`,
+    "",
+  ].join("\n");
+}
+
+/** sitemap.xml に載せるページ。トップ、記事、月別の一覧、タグの一覧の順 */
+function sitemapEntries(posts: readonly PostContent[]): SitemapEntry[] {
+  const postEntries = posts.map((post) => ({ url: absoluteUrl(postPath(post.slug)), lastModified: post.updatedAt }));
+  const home = { url: absoluteUrl(HOME_PATH), lastModified: latest(postEntries.map((entry) => entry.lastModified)) };
   const archives = groupPostsByMonth(posts).map((archive) => ({
     url: absoluteUrl(archivePath(archive.month)),
     lastModified: latest(archive.posts.map((post) => post.updatedAt)),
   }));
-  const urls = [home, ...entries, ...archives, ...tagEntries(groupPostsByTag(posts))].map(({ url, lastModified }) => {
-    const lastmod = lastModified === undefined ? [] : [element("lastmod", lastModified)];
 
-    return ["<url>", element("loc", url), ...lastmod, "</url>"].join("\n");
-  });
+  return [home, ...postEntries, ...archives, ...tagEntries(groupPostsByTag(posts))];
+}
 
-  return [
-    `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
-    ...urls,
-    `</urlset>`,
-    "",
-  ].join("\n");
+/** <url> 要素（loc と、あれば lastmod） */
+function urlElement({ url, lastModified }: SitemapEntry): string {
+  const lastmod = lastModified === undefined ? [] : [element("lastmod", lastModified)];
+
+  return ["<url>", element("loc", url), ...lastmod, "</url>"].join("\n");
 }
 
 /**
  * タグの一覧（/tags/）とタグごとの一覧のページ。タグが 1 つも無ければ載せない（/tags/ は中身の無いページのため）。
  * /tags/ の lastmod は、タグの付いた記事の最新の更新日時
  */
-function tagEntries(tags: readonly TagArchive[]): { url: string; lastModified: string | undefined }[] {
+function tagEntries(tags: readonly TagArchive[]): SitemapEntry[] {
   if (tags.length === 0) return [];
 
   const tagPages = tags.map((archive) => ({
