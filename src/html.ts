@@ -139,7 +139,7 @@ function withSidebar(content: string, posts: readonly PostContent[]): string {
 
 /** 記事一覧の 1 件 */
 function postCard(post: PostContent): string {
-  const cardClass = [classOf("PostList", "card"), classOf("PostList", "post")].filter(Boolean).join(" ");
+  const cardClass = classList(["PostList", "card"], ["PostList", "post"]);
   const title = `<h2${cls("PostList", "title")}><a href="${escapeHtml(postPath(post.slug))}">${escapeHtml(post.title)}</a></h2>`;
   const summary = `<p${cls("PostList", "summary")}>${escapeHtml(post.summary)}</p>`;
   const date = `<time datetime="${escapeHtml(post.publishedAt)}"${cls("PostList", "date")}>${formatDate(post.publishedAt)}</time>`;
