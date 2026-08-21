@@ -3,6 +3,7 @@
 
 import type { PostContent } from "../shared/lib/post-types.ts";
 import { groupPostsByMonth } from "./archive.ts";
+import { isUpdatedAfterPublished } from "./posts.ts";
 import {
   absoluteUrl,
   archivePath,
@@ -67,7 +68,7 @@ function entryLines(post: PostContent): string[] {
 
 /** entry の updated。公開後に更新したときだけ updatedAt を使う */
 function entryUpdated({ publishedAt, updatedAt }: PostContent): string {
-  return toRfc3339(Date.parse(updatedAt) > Date.parse(publishedAt) ? updatedAt : publishedAt);
+  return toRfc3339(isUpdatedAfterPublished(publishedAt, updatedAt) ? updatedAt : publishedAt);
 }
 
 /** UTC の RFC 3339（例：2026-10-01T00:00:00.000Z）にそろえる。読めない日時はビルドを止める */

@@ -14,6 +14,7 @@ import { isMarpMarkdown, renderMarp } from "../shared/lib/marp.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
 import { groupPostsByMonth, type MonthArchive } from "./archive.ts";
 import { classOf, type ModuleName } from "./css.ts";
+import { isUpdatedAfterPublished } from "./posts.ts";
 import {
   absoluteUrl,
   archiveDescription,
@@ -191,7 +192,7 @@ function postDates(post: PostContent): string {
   const updatedDate = formatDate(post.updatedAt);
   const published = `<span>公開日 <time datetime="${escapeHtml(post.publishedAt)}">${publishedDate}</time></span>`;
   // 日本時間で公開日と違う日に更新したときだけ出す。公開後の更新に限る
-  const isUpdateShown = updatedDate !== publishedDate && Date.parse(post.updatedAt) > Date.parse(post.publishedAt);
+  const isUpdateShown = updatedDate !== publishedDate && isUpdatedAfterPublished(post.publishedAt, post.updatedAt);
   const updated = isUpdateShown ? `<span>更新日 <time datetime="${escapeHtml(post.updatedAt)}">${updatedDate}</time></span>` : "";
 
   return `<p${cls("PostDetail", "dates")}>${published}${updated}</p>`;
@@ -355,7 +356,7 @@ function headTags({ title, description, path, article, noindex }: HeadOptions, a
 function modifiedTime(article: HeadOptions["article"]): string | undefined {
   if (article === undefined) return undefined;
 
-  return Date.parse(article.updatedTime) > Date.parse(article.publishedTime) ? article.updatedTime : undefined;
+  return isUpdatedAfterPublished(article.publishedTime, article.updatedTime) ? article.updatedTime : undefined;
 }
 
 function meta(attrs: Record<string, string>): string {
