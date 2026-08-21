@@ -31,7 +31,7 @@ export function buildAtomFeed(posts: readonly PostContent[], now: Date): string 
     .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
     .slice(0, FEED_ENTRY_LIMIT);
   const updatedTimes = latestPosts.map(entryUpdated);
-  const feedUpdated = updatedTimes.reduce((max, updated) => (updated > max ? updated : max), updatedTimes[0] ?? now.toISOString());
+  const feedUpdated = latest(updatedTimes) ?? now.toISOString();
 
   const lines = [
     `<?xml version="1.0" encoding="utf-8"?>`,
