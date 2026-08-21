@@ -20,8 +20,11 @@ export const POST_LIST_TITLE = "雑記";
 export const POST_LIST_LEAD = SITE_DESCRIPTION;
 export const POST_LIST_EMPTY_TEXT = "なんもない";
 
+/** ナビ・サイドバー・フッターに並べるリンク */
+export type SiteLink = { href: string; label: string };
+
 /** ヘッダーのナビの項目。href は末尾を / にしたサイト内のパス */
-export const NAV_ITEMS: readonly { href: string; label: string }[] = [
+export const NAV_ITEMS: readonly SiteLink[] = [
   { href: "/", label: POST_LIST_TITLE },
   { href: "/tags/", label: "タグ" },
 ];
@@ -33,10 +36,10 @@ export const PROFILE_BIO = "自称エンジニア　好きなものはゲーム�
 export const PROFILE_ICON = { path: "/apple-icon.png", size: 56 };
 
 /** portfolio へのリンク（サイドバーのプロフィールとフッターで使う） */
-const PORTFOLIO_LINK = { href: "https://elysdev.net/", label: "ポートフォリオ" };
+const PORTFOLIO_LINK: SiteLink = { href: "https://elysdev.net/", label: "ポートフォリオ" };
 
 /** サイドバーのプロフィールの下に並べるリンク */
-export const PROFILE_LINKS: readonly { href: string; label: string }[] = [
+export const PROFILE_LINKS: readonly SiteLink[] = [
   { href: "https://github.com/elys0912", label: "GitHub" },
   PORTFOLIO_LINK,
 ];
@@ -71,7 +74,7 @@ export function tagDescription(tag: string): string {
 }
 
 /** フッターの著作権の表示の後ろに置くリンク。記事のライセンスの案内と、portfolio */
-export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
+export const FOOTER_LINKS: readonly SiteLink[] = [
   {
     href: "https://github.com/elys0912/elys0912.github.io/blob/main/content/LICENSE.md",
     label: "記事のライセンス",
