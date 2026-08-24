@@ -18,7 +18,7 @@ const UNSAFE_IMAGE_PATH_CHAR = /[\\:*?"<>|\x00-\x1f\x7f]/;
  * /images/<slug>/<ファイル名> の形でない参照（外部の URL など）は拾わない。
  */
 export function imageReferences(text: string): string[] {
-  const normalized = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   const body = blankOut(normalized);
   const sources: string[] = [];
 

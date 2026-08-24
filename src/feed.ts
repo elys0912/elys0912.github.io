@@ -154,7 +154,7 @@ function link(attrs: Record<string, string>): string {
 }
 
 // XML 1.0 で使えない制御文字（タブ、改行、復帰以外の C0 制御文字など）。残すと XML として不正になる
-const INVALID_XML_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
+const INVALID_XML_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
 
 const xmlEntities: Record<string, string> = {
   "&": "&amp;",
