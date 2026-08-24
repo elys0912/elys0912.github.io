@@ -58,19 +58,31 @@ export function imageReferences(text: string): string[] {
 /** src を "<slug>/<ファイル名>" にする。/images/<slug>/<ファイル名> の形でなければ undefined */
 function imageKeyOf(src: string): string | undefined {
   if (!src.startsWith("/") || src.startsWith("//")) return undefined;
+
   let decoded: string;
   try {
     decoded = decodeURI(src);
   } catch {
     return undefined;
   }
+
   const match = IMAGE_PATH.exec(decoded);
-  if (!match || match[1] === "." || match[1] === ".." || match[2] === "." || match[2] === ".." || /[?#]/.test(decoded)) {
-    return undefined;
-  }
+  if (match === null) return undefined;
+
+  const [, slug, fileName] = match;
+  const hasDotSegment = isDotSegment(slug) || isDotSegment(fileName);
+  const hasQueryOrFragment = /[?#]/.test(decoded);
+  if (hasDotSegment || hasQueryOrFragment) return undefined;
+
   // 拾わなかった参照は、書き出した後の checkSiteResources（src/build.ts）で out/ に無いものとしてビルドを止める
   if (UNSAFE_IMAGE_PATH_CHAR.test(decoded)) return undefined;
-  return `${match[1]}/${match[2]}`;
+
+  return `${slug}/${fileName}`;
+}
+
+/** パスの区切りの間が「.」か「..」か（今の階層・上の階層を指す） */
+function isDotSegment(segment: string): boolean {
+  return segment === "." || segment === "..";
 }
 
 /** frontmatter に marp の行があるか（大文字小文字・値は問わない。画像の参照を広めに拾うことを優先する） */
