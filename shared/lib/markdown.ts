@@ -133,9 +133,15 @@ function forEachElement(node: Root | Element, callback: (element: Element) => vo
 }
 
 function textContent(node: Element): string {
-  return node.children
-    .map((child) => (child.type === "text" ? child.value : child.type === "element" ? textContent(child) : ""))
-    .join("");
+  return node.children.map(childText).join("");
+}
+
+/** 子のノードの文字。テキストはそのまま、要素は中の文字、それ以外（コメントなど）は空 */
+function childText(child: Element["children"][number]): string {
+  if (child.type === "text") return child.value;
+  if (child.type === "element") return textContent(child);
+
+  return "";
 }
 
 // http(s):// とスキーム省略の //host/ を外部リンクとして扱う
