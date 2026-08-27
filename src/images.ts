@@ -103,22 +103,24 @@ function blankOut(text: string): string {
   return blankInlineCode(blankFences(lines).join("\n").replace(/<!--[\s\S]*?-->/g, keepNewlines));
 }
 
-/** フェンスのコードブロックの行を空にする（lines を書き換えて返す） */
-function blankFences(lines: string[]): string[] {
+/** フェンスのコードブロックの行を空にした写しを返す（lines は書き換えない） */
+function blankFences(lines: readonly string[]): string[] {
+  const blanked = [...lines];
   // リストの中のコードブロックも拾うため、フェンスの前のインデントは数えない
   let fence: string | undefined;
-  for (let i = 0; i < lines.length; i++) {
-    const opening = /^[ \t]*(`{3,}|~{3,})/.exec(lines[i]);
+  for (let i = 0; i < blanked.length; i++) {
+    const opening = /^[ \t]*(`{3,}|~{3,})/.exec(blanked[i]);
     if (fence) {
-      const closing = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(lines[i]);
+      const closing = /^[ \t]*(`{3,}|~{3,})[ \t]*$/.exec(blanked[i]);
       if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) fence = undefined;
-      lines[i] = "";
-    } else if (opening && !(opening[1][0] === "`" && lines[i].slice(opening[0].length).includes("`"))) {
+      blanked[i] = "";
+    } else if (opening && !(opening[1][0] === "`" && blanked[i].slice(opening[0].length).includes("`"))) {
       fence = opening[1];
-      lines[i] = "";
+      blanked[i] = "";
     }
   }
-  return lines;
+
+  return blanked;
 }
 
 function blankInlineCode(text: string): string {
