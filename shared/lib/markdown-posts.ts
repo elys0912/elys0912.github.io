@@ -321,12 +321,10 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
   const workFields = work ? readWorkFields(data, errors) : undefined;
   const tags = work ? undefined : readTags(data, errors);
 
-  // ブロックで書いたキーは上でエラーにしたので、「ありません」は重ねない
-  const missing = (key: string) => !Object.hasOwn(data, key) && !blockKeys.includes(key);
-  const { title, summary, publishedAt, draft = false, marp = false } = data;
-  checkText("title", title, MAX_TITLE_LENGTH, missing("title"), errors);
-  checkText("summary", summary, MAX_SUMMARY_LENGTH, missing("summary"), errors);
-  const publishedAtUtc = readPublishedAt(publishedAt, missing("publishedAt"), errors);
+  const { title, summary, draft = false, marp = false } = data;
+  checkText(parsed, "title", MAX_TITLE_LENGTH, errors);
+  checkText(parsed, "summary", MAX_SUMMARY_LENGTH, errors);
+  const publishedAtUtc = readPublishedAt(parsed, errors);
   if (typeof draft !== "boolean") errors.push("draft は true か false で書く");
   if (typeof marp !== "boolean") errors.push("marp は true か false で書く");
   if (marp !== true) {
@@ -497,24 +495,28 @@ function isWorkBadge(value: string): value is WorkBadge {
   return (WORK_BADGES as readonly string[]).includes(value);
 }
 
-/** 必須の文字列。空白だけは不可、長さはコードポイントで数える */
-function checkText(
-  key: string,
-  value: FrontmatterValue | undefined,
-  maxLength: number,
-  missing: boolean,
-  errors: string[],
-): void {
-  if (missing) errors.push(`${key} がありません`);
+/** frontmatter で読んだ値（data）と、ブロックで書いたキー（blockKeys） */
+type FrontmatterFields = Pick<ParsedMarkdown, "data" | "blockKeys">;
+
+/** key を書いていないか。ブロックで書いたキーは checkKeys でエラーにしたので、「ありません」は重ねない */
+function isMissing({ data, blockKeys }: FrontmatterFields, key: string): boolean {
+  return !Object.hasOwn(data, key) && !blockKeys.includes(key);
+}
+
+/** 必須の文字列 key を検査する。空白だけは不可、長さはコードポイントで数える。問題は errors に足す */
+function checkText(fields: FrontmatterFields, key: string, maxLength: number, errors: string[]): void {
+  const value = fields.data[key];
+  if (isMissing(fields, key)) errors.push(`${key} がありません`);
   else if (value === undefined) return;
   else if (typeof value !== "string" || BLANK.test(value)) errors.push(`${key} は空でない文字列で書く`);
   else if ([...value].length > maxLength) errors.push(`${key} は ${maxLength} 文字まで`);
 }
 
 /** publishedAt を UTC の ISO 文字列にする。読めなければ undefined。問題は errors に足す */
-function readPublishedAt(value: FrontmatterValue | undefined, missing: boolean, errors: string[]): string | undefined {
+function readPublishedAt(fields: FrontmatterFields, errors: string[]): string | undefined {
+  const value = fields.data.publishedAt;
   const utc = typeof value === "string" ? toUtc(value) : undefined;
-  if (missing) errors.push("publishedAt がありません");
+  if (isMissing(fields, "publishedAt")) errors.push("publishedAt がありません");
   else if (value !== undefined && utc === undefined) {
     errors.push(`publishedAt をオフセット付きの ISO 8601 として読めません（例: 2026-10-10T09:00:00+09:00）: ${value}`);
   }
