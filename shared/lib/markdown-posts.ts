@@ -317,7 +317,7 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
 
   const errors: string[] = [];
   const keys = [...Object.keys(data), ...blockKeys];
-  checkKeys(data, blockKeys, work, errors);
+  checkKeys(keys, data, blockKeys, work, errors);
   const workFields = work ? readWorkFields(data, errors) : undefined;
   const tags = work ? undefined : readTags(data, errors);
 
@@ -363,10 +363,19 @@ function decodeUtf8(bytes: Uint8Array): string | undefined {
   }
 }
 
-/** キーの種類を検査する（知らないキー、ブロックにできないキー、リストにできないキー）。問題は errors に足す */
-function checkKeys(data: Record<string, FrontmatterValue>, blockKeys: string[], work: boolean, errors: string[]): void {
+/**
+ * キーの種類を検査する（知らないキー、ブロックにできないキー、リストにできないキー）。問題は errors に足す。
+ * keys は data のキーと blockKeys を並べたもの
+ */
+function checkKeys(
+  keys: string[],
+  data: Record<string, FrontmatterValue>,
+  blockKeys: string[],
+  work: boolean,
+  errors: string[],
+): void {
   const knownKeys = work ? WORK_KNOWN_KEYS : BLOG_KNOWN_KEYS;
-  for (const key of [...Object.keys(data), ...blockKeys]) {
+  for (const key of keys) {
     if (knownKeys.includes(key)) continue;
     const known = knownKeys.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
     errors.push(
