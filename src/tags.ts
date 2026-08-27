@@ -22,7 +22,11 @@ const UNSAFE_TAG = /^\.|\.$|[\\:*?"<>|]/;
 export function groupPostsByTag(posts: readonly PostContent[]): TagArchive[] {
   const postsByTag = new Map<string, PostContent[]>();
   for (const post of posts) {
-    for (const tag of post.tags ?? []) postsByTag.set(tag, [...(postsByTag.get(tag) ?? []), post]);
+    for (const tag of post.tags ?? []) {
+      const tagPosts = postsByTag.get(tag);
+      if (tagPosts === undefined) postsByTag.set(tag, [post]);
+      else tagPosts.push(post);
+    }
   }
 
   assertTagsUsableAsDirectoryNames([...postsByTag.keys()]);
