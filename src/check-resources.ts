@@ -10,9 +10,6 @@ import { SITE_URL } from "./site.ts";
 /** href のうち、画像へのリンクとして確かめるものの接頭辞（本文の [図](/images/<slug>/x.webp) など） */
 const IMAGE_LINK_PREFIX = `/${IMAGES_DIRECTORY_NAME}/`;
 
-/** siteFileOf が返す、out/ の中のファイルとして扱えない src の印（どのファイルにも一致しない） */
-const INVALID_SITE_FILE = "";
-
 const HTML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 
 /**
@@ -29,7 +26,10 @@ export function checkSiteResources(outDir: string): void {
     const pageUrl = new URL(pageUrlPath(file, outDir), SITE_URL);
     for (const src of resourceUrls(html)) {
       const target = siteFileOf(src, pageUrl, outDir);
-      if (target !== undefined && !isFile(target)) {
+      if (target.kind === "external") continue;
+
+      const exists = target.kind === "file" && isFile(target.path);
+      if (!exists) {
         problems.push(`${path.relative(outDir, file).replaceAll(path.sep, "/")}: ${src}`);
       }
     }
@@ -45,54 +45,79 @@ export function checkSiteResources(outDir: string): void {
 
 /** HTML の中の <img src>、/images/ で始まる href、style 属性・<style> の中の url(…)。HTML の文字参照は戻す */
 function resourceUrls(html: string): string[] {
-  const urls: string[] = [];
-  const styles: string[] = [];
-  // 本文の中の < は文字参照になっているため、開始タグとして読むのは本物のタグだけ
-  for (const tag of html.matchAll(/<([a-zA-Z][\w:-]*)((?:\s+[^\s"'>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/g)) {
-    const [, name, attrs] = tag;
-    for (const attr of attrs.matchAll(/\s([^\s"'>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
-      const attrName = attr[1].toLowerCase();
-      const value = decodeHtmlEntities(attr[2] ?? attr[3] ?? attr[4] ?? "");
-      if (name.toLowerCase() === "img" && attrName === "src") urls.push(value);
-      if (attrName === "href" && value.trim().startsWith(IMAGE_LINK_PREFIX)) urls.push(value);
-      if (attrName === "style") styles.push(value);
-    }
-  }
-  for (const match of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) styles.push(match[1]);
-
-  for (const style of styles) {
-    for (const match of style.matchAll(/\burl\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)) {
-      urls.push(match[1] ?? match[2] ?? match[3]);
-    }
-  }
+  const attributes = tagAttributes(html);
+  const linkedUrls = attributes.filter(isResourceLink).map((attribute) => attribute.value);
+  const styles = [
+    ...attributes.filter((attribute) => attribute.name === "style").map((attribute) => attribute.value),
+    ...[...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((match) => match[1]),
+  ];
+  const urls = [...linkedUrls, ...styles.flatMap(styleUrls)];
 
   return urls.map((url) => url.trim()).filter((url) => url !== "");
 }
 
-/** src がサイト内のファイルを指すなら out/ の中のパス。外部の URL、data:、#… は undefined */
-function siteFileOf(src: string, pageUrl: URL, outDir: string): string | undefined {
-  if (src.startsWith("#") || /^data:/i.test(src)) return undefined;
+/** 開始タグの属性 1 つ分。tagName と name は小文字、value は文字参照を戻した値 */
+type TagAttribute = { tagName: string; name: string; value: string };
+
+/** HTML の開始タグの属性を、出てきた順に並べる */
+function tagAttributes(html: string): TagAttribute[] {
+  const attributes: TagAttribute[] = [];
+  // 本文の中の < は文字参照になっているため、開始タグとして読むのは本物のタグだけ
+  for (const tag of html.matchAll(/<([a-zA-Z][\w:-]*)((?:\s+[^\s"'>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/g)) {
+    const [, tagName, attrs] = tag;
+    for (const attr of attrs.matchAll(/\s([^\s"'>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
+      const value = decodeHtmlEntities(attr[2] ?? attr[3] ?? attr[4] ?? "");
+      attributes.push({ tagName: tagName.toLowerCase(), name: attr[1].toLowerCase(), value });
+    }
+  }
+
+  return attributes;
+}
+
+/** ファイルを読み込む属性か（<img src> と、/images/ で始まる href） */
+function isResourceLink({ tagName, name, value }: TagAttribute): boolean {
+  if (tagName === "img" && name === "src") return true;
+
+  return name === "href" && value.trim().startsWith(IMAGE_LINK_PREFIX);
+}
+
+/** CSS の中の url(…) */
+function styleUrls(style: string): string[] {
+  return [...style.matchAll(/\burl\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)].map((match) => match[1] ?? match[2] ?? match[3]);
+}
+
+/**
+ * siteFileOf の結果。external は確かめないもの（外部の URL、data:、#…）。
+ * invalid は out/ の中のファイルとして扱えないもの（どのファイルにも一致せず、無いものとして扱う）。file は out/ の中のパス
+ */
+type SiteFile = { kind: "external" } | { kind: "invalid" } | { kind: "file"; path: string };
+
+/** src が指す、out/ の中のファイル */
+function siteFileOf(src: string, pageUrl: URL, outDir: string): SiteFile {
+  if (src.startsWith("#") || /^data:/i.test(src)) return { kind: "external" };
 
   let url: URL;
   try {
     url = new URL(src, pageUrl);
   } catch {
-    return undefined;
+    return { kind: "external" };
   }
-  if (url.origin !== SITE_URL.origin) return undefined;
+  if (url.origin !== SITE_URL.origin) return { kind: "external" };
 
   let pathname: string;
   try {
     pathname = decodeURIComponent(url.pathname);
   } catch {
     // デコードできない %… は配信されるファイルを指さない
-    return INVALID_SITE_FILE;
+    return { kind: "invalid" };
   }
   const segments = pathname.split("/").filter(Boolean);
   // %5C のように、デコードした後で区切りや上の階層になるものは out/ の外を指しうるので、無いものとして扱う
-  if (segments.some((segment) => segment === "." || segment === ".." || segment.includes("\\"))) return INVALID_SITE_FILE;
+  if (segments.some((segment) => segment === "." || segment === ".." || segment.includes("\\"))) return { kind: "invalid" };
 
-  return pathname.endsWith("/") ? path.join(outDir, ...segments, "index.html") : path.join(outDir, ...segments);
+  const file = pathname.endsWith("/") ? path.join(outDir, ...segments, "index.html") : path.join(outDir, ...segments);
+
+  return { kind: "file", path: file };
 }
 
 /** out/ の中の HTML ファイルのサイト内のパス（out/posts/a/index.html → /posts/a/） */
