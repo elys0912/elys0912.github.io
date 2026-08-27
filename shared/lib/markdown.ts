@@ -66,6 +66,10 @@ const processor = unified()
   .use(rehypeStringify)
   .freeze();
 
+/**
+ * Markdown をサニタイズ済みの HTML にする（目次の id は付けない）。
+ * 本番の表示は renderMarkdownWithHeadings を通る。これはサニタイズと変換の結果を単体で確かめるテストのために公開している
+ */
 export function renderMarkdown(markdown: string): string {
   return String(processor.processSync(markdown));
 }
