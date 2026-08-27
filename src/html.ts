@@ -8,7 +8,7 @@
 // Marp の HTML は shared/lib/marp.ts が html: false（生の HTML はエスケープ）で変換済み。この 2 つはそのまま埋め込む。
 // ただし Marp は html: false でも、記事の <style> をスライドの CSS に、HTML のコメントをディレクティブとして読む。
 
-import { formatDate } from "../shared/lib/format.ts";
+import { formatDate, formatYear } from "../shared/lib/format.ts";
 import { renderMarkdownWithHeadings, type Heading } from "../shared/lib/markdown.ts";
 import { isMarpMarkdown, renderMarp } from "../shared/lib/marp.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
@@ -398,7 +398,7 @@ function currentNavHref(currentPath: string | undefined): string | undefined {
  * フッター。著作権の表示の年は日本時間で数える。ビルド環境（CI は UTC）の時差の影響を避けるため。
  */
 function siteFooter(now: Date): string {
-  const year = formatDate(now.toISOString()).slice(0, 4);
+  const year = formatYear(now);
   const links = FOOTER_LINKS.map(
     (link) => `<span> ・ <a href="${escapeHtml(link.href)}" rel="noopener noreferrer">${escapeHtml(link.label)}</a></span>`,
   );
