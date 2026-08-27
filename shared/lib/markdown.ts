@@ -16,7 +16,7 @@ const tableCellAlign: [string, ...string[]] = ["align", "left", "center", "right
  * id と name は許可しないので、ページ内の要素を上書き（DOM clobbering）されることもない。
  * h1 はページのタイトル専用なので許可しない（本文の見出しは rehypeShiftHeadings で h2 以下になる）。
  */
-export const sanitizeSchema: SanitizeSchema = {
+const sanitizeSchema: SanitizeSchema = {
   tagNames: [
     "h2", "h3", "h4", "h5", "h6",
     "p", "br", "hr",
