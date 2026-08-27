@@ -20,39 +20,70 @@ const UNSAFE_IMAGE_PATH_CHAR = /[\\:*?"<>|\x00-\x1f\x7f]/;
 export function imageReferences(text: string): string[] {
   const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   const body = blankOut(normalized);
-  const sources: string[] = [];
+  const sources = [
+    ...inlineImageSources(body),
+    ...referenceImageSources(body),
+    ...imgTagSources(body),
+    ...(isMarpText(normalized) ? marpSources(normalized) : []),
+  ];
 
+  return [...new Set(sources.flatMap((src) => imageKeyOf(src.trim()) ?? []))];
+}
+
+/** 画像の Markdown の alt（![…] の […]）、リンク先（(…) の中）、タイトル（"…" '…' (…)）の正規表現の部品 */
+const IMAGE_ALT = String.raw`((?:[^\[\]\\\n]|\\.|\[[^\[\]\n]*\])*)`;
+const IMAGE_DESTINATION = String.raw`(<[^<>\n]*>|(?:[^\s()\\]|\\.|\([^\s()]*\))*)`;
+const IMAGE_TITLE = String.raw`(?:[ \t\n]+(?:"[^"]*"|'[^']*'|\([^)]*\)))?`;
+
+/** ![alt](リンク先 "タイトル")。2 番目のグループがリンク先 */
+const INLINE_IMAGE = new RegExp(String.raw`!\[${IMAGE_ALT}\]\([ \t\n]*${IMAGE_DESTINATION}${IMAGE_TITLE}[ \t\n]*\)`, "g");
+
+/** ![alt][ラベル]、![alt][]、![alt]。ラベルが空か無ければ alt をラベルとして引く */
+const REFERENCE_IMAGE = new RegExp(String.raw`!\[${IMAGE_ALT}\](?:\[((?:[^\[\]\\]|\\.)*)\])?(?![(\[:])`, "g");
+
+/** 参照の定義 [ラベル]: リンク先 */
+const REFERENCE_DEFINITION = /^ {0,3}\[((?:[^\[\]\\]|\\.)+)\]:[ \t]*(?:\n[ \t]*)?(<[^<>\n]*>|\S+)/gm;
+
+/** ![…](…) のリンク先 */
+function inlineImageSources(body: string): string[] {
+  return [...body.matchAll(INLINE_IMAGE)].map((match) => unwrap(match[2]));
+}
+
+/** 参照形式の ![…][…] が指す、参照の定義のリンク先。定義が無いものは拾わない */
+function referenceImageSources(body: string): string[] {
+  const definitions = referenceDefinitions(body);
+
+  return [...body.matchAll(REFERENCE_IMAGE)].flatMap((match) => definitions.get(normalizeLabel(match[2] || match[1])) ?? []);
+}
+
+/** 参照の定義（正規化したラベル → リンク先）。同じラベルは最初の定義を使う */
+function referenceDefinitions(body: string): Map<string, string> {
   const definitions = new Map<string, string>();
-  for (const match of body.matchAll(/^ {0,3}\[((?:[^\[\]\\]|\\.)+)\]:[ \t]*(?:\n[ \t]*)?(<[^<>\n]*>|\S+)/gm)) {
+  for (const match of body.matchAll(REFERENCE_DEFINITION)) {
     const label = normalizeLabel(match[1]);
     if (!definitions.has(label)) definitions.set(label, unwrap(match[2]));
   }
 
-  const alt = String.raw`((?:[^\[\]\\\n]|\\.|\[[^\[\]\n]*\])*)`;
-  const destination = String.raw`(<[^<>\n]*>|(?:[^\s()\\]|\\.|\([^\s()]*\))*)`;
-  const title = String.raw`(?:[ \t\n]+(?:"[^"]*"|'[^']*'|\([^)]*\)))?`;
-  for (const match of body.matchAll(new RegExp(String.raw`!\[${alt}\]\([ \t\n]*${destination}${title}[ \t\n]*\)`, "g"))) {
-    sources.push(unwrap(match[2]));
-  }
-  for (const match of body.matchAll(new RegExp(String.raw`!\[${alt}\](?:\[((?:[^\[\]\\]|\\.)*)\])?(?![(\[:])`, "g"))) {
-    const definition = definitions.get(normalizeLabel(match[2] || match[1]));
-    if (definition !== undefined) sources.push(definition);
-  }
-  for (const match of body.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi)) {
-    sources.push(match[1] ?? match[2] ?? match[3]);
-  }
+  return definitions;
+}
 
-  if (isMarpText(normalized)) {
-    const code = blankInlineCode(blankFences(normalized.split("\n")).join("\n"));
-    for (const match of code.matchAll(/\burl\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)) {
-      const src = match[1] ?? match[2] ?? match[3];
-      // url(#id) は SVG の中の参照で、ファイルを読み込まない
-      if (!src.startsWith("#")) sources.push(src);
-    }
-    for (const match of code.matchAll(/@import\s+(?:"([^"]*)"|'([^']*)')/gi)) sources.push(match[1] ?? match[2]);
-  }
+/** <img src="…"> の src */
+function imgTagSources(body: string): string[] {
+  return [...body.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi)].map(
+    (match) => match[1] ?? match[2] ?? match[3],
+  );
+}
 
-  return [...new Set(sources.flatMap((src) => imageKeyOf(src.trim()) ?? []))];
+/** Marp の記事の、コードの外の url(…) と @import "…"。frontmatter と HTML のコメントの中も拾う */
+function marpSources(normalized: string): string[] {
+  const code = blankInlineCode(blankFences(normalized.split("\n")).join("\n"));
+  const urls = [...code.matchAll(/\burl\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)]
+    .map((match) => match[1] ?? match[2] ?? match[3])
+    // url(#id) は SVG の中の参照で、ファイルを読み込まない
+    .filter((src) => !src.startsWith("#"));
+  const imports = [...code.matchAll(/@import\s+(?:"([^"]*)"|'([^']*)')/gi)].map((match) => match[1] ?? match[2]);
+
+  return [...urls, ...imports];
 }
 
 /** src を "<slug>/<ファイル名>" にする。/images/<slug>/<ファイル名> の形でなければ undefined */
