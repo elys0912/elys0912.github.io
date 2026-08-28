@@ -313,42 +313,59 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
   if (text === undefined) return "UTF-8 として読めません";
   const parsed = parseFrontmatter(text);
   if (typeof parsed === "string") return parsed;
-  const { data, blockKeys, lines, body } = parsed;
 
+  const { data, blockKeys } = parsed;
   const errors: string[] = [];
   const keys = [...Object.keys(data), ...blockKeys];
   checkKeys(keys, data, blockKeys, work, errors);
   const workFields = work ? readWorkFields(data, errors) : undefined;
   const tags = work ? undefined : readTags(data, errors);
+  const fields = readPostFields(parsed, keys, errors);
+  if (errors.length > 0 || fields === undefined) return errors.join(" / ");
 
-  const { title, summary, draft = false, marp = false } = data;
+  const { title, summary, publishedAt, draft, marp } = fields;
+  return {
+    slug,
+    title,
+    summary,
+    bodyMarkdown: postBodyMarkdown(parsed, marp),
+    publishedAt,
+    updatedAt: publishedAt,
+    ...(draft ? { draft } : {}),
+    ...(tags !== undefined ? { tags } : {}),
+    ...workFields,
+  };
+}
+
+/** どの記事にもある項目。publishedAt は UTC の ISO 文字列 */
+type PostFields = { title: string; summary: string; publishedAt: string; draft: boolean; marp: boolean };
+
+/**
+ * どの記事にもある項目（title、summary、publishedAt、draft、marp）と、Marp の指定を書けるかを検査して読む。
+ * 問題は errors に足す。型が合わない項目があれば undefined。keys は data のキーと blockKeys を並べたもの
+ */
+function readPostFields(parsed: ParsedMarkdown, keys: string[], errors: string[]): PostFields | undefined {
+  const { title, summary, draft = false, marp = false } = parsed.data;
   checkText(parsed, "title", MAX_TITLE_LENGTH, errors);
   checkText(parsed, "summary", MAX_SUMMARY_LENGTH, errors);
-  const publishedAtUtc = readPublishedAt(parsed, errors);
+  const publishedAt = readPublishedAt(parsed, errors);
   if (typeof draft !== "boolean") errors.push("draft は true か false で書く");
   if (typeof marp !== "boolean") errors.push("marp は true か false で書く");
   if (marp !== true) {
     const directives = keys.filter((key) => MARP_DIRECTIVE_KEYS.has(key));
     if (directives.length > 0) errors.push(`${directives.join("、")} は Marp の記事（marp: true）にだけ書ける`);
   }
-  // 型の絞り込みのための条件（errors が空なら、title と summary は文字列、publishedAtUtc はある）
-  if (errors.length > 0 || typeof title !== "string" || typeof summary !== "string" || publishedAtUtc === undefined) {
-    return errors.join(" / ");
-  }
+  // 型の絞り込みのための条件（errors が空なら、title と summary は文字列、publishedAt はある）
+  if (typeof title !== "string" || typeof summary !== "string" || publishedAt === undefined) return undefined;
 
-  // Marp の記事は、frontmatter の残りを本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）
-  const bodyMarkdown = marp === true ? [DELIMITER, ...keepMarpFrontmatterLines(lines, data), DELIMITER, body].join("\n") : body;
-  return {
-    slug,
-    title,
-    summary,
-    bodyMarkdown,
-    publishedAt: publishedAtUtc,
-    updatedAt: publishedAtUtc,
-    ...(draft === true ? { draft } : {}),
-    ...(tags !== undefined ? { tags } : {}),
-    ...workFields,
-  };
+  return { title, summary, publishedAt, draft: draft === true, marp: marp === true };
+}
+
+/** 記事の本文。Marp の記事は、frontmatter の残りを本文の先頭に残す（lib/marp.ts が marp: true を見て判定する） */
+function postBodyMarkdown({ data, lines, body }: ParsedMarkdown, marp: boolean): string {
+  if (!marp) return body;
+
+  return [DELIMITER, ...keepMarpFrontmatterLines(lines, data), DELIMITER, body].join("\n");
 }
 
 /** UTF-8 として読む。読めなければ undefined */
