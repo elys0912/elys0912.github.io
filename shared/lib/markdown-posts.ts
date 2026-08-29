@@ -421,36 +421,79 @@ function keepMarpFrontmatterLines(lines: string[], data: Record<string, Frontmat
   });
 }
 
+/** 1 行のリストで書く値（記事の tags、作品の tech）の規則。文言は key と itemName から組み立てる */
+type StringListRule = {
+  key: string;
+  /** 「1 行のリストで書く」の例に出す要素 */
+  example: string;
+  maxItems: number;
+  /** 1 個の長さの上限。コードポイントで数える */
+  maxLength: number;
+  /** 「同じ〇〇が 2 回以上」の〇〇 */
+  itemName: string;
+  /** 1 個に含めない文字と、その説明 */
+  forbidden?: { pattern: RegExp; description: string };
+  /** 検査の前に各要素へ当てる正規化。検査も戻り値も正規化した後の値を使う */
+  normalize?: (item: string) => string;
+};
+
 /**
- * 記事のタグを読む。書いていなければ undefined。問題は errors に足す。
- * 1 行のリストで 1〜MAX_TAGS 個、1 個 MAX_TAG_LENGTH 文字まで、TAG_FORBIDDEN の文字を含まない、同じタグは 1 回だけ。
+ * 記事のタグの規則。1 行のリストで 1〜MAX_TAGS 個、1 個 MAX_TAG_LENGTH 文字まで、TAG_FORBIDDEN の文字を含まない、同じタグは 1 回だけ。
  * 各タグは NFC に正規化してから検査し、正規化した値を返す。見た目が同じで文字コードが違うタグ（NFC と NFD）を、
  * 同じ文字数で数え、同じタグとして比べるため（例: NFD の「が」は 2 文字ではなく 1 文字と数える）。
+ */
+const TAGS_RULE: StringListRule = {
+  key: TAGS_KEY,
+  example: "aws, TypeScript",
+  maxItems: MAX_TAGS,
+  maxLength: MAX_TAG_LENGTH,
+  itemName: "タグ",
+  forbidden: { pattern: TAG_FORBIDDEN, description: "空白、「,」、「/」" },
+  normalize: (tag) => tag.normalize("NFC"),
+};
+
+/** 作品の tech の規則。1 行のリストで 1〜MAX_TECH_ITEMS 個、1 個 MAX_TECH_LENGTH 文字まで、同じ語は 1 回だけ */
+const TECH_RULE: StringListRule = {
+  key: "tech",
+  example: "TypeScript, Node.js",
+  maxItems: MAX_TECH_ITEMS,
+  maxLength: MAX_TECH_LENGTH,
+  itemName: "語",
+};
+
+/**
+ * 記事のタグを読む（TAGS_RULE）。書いていないか問題があれば undefined。問題は errors に足す。
  * 空のリストと空の要素は parseFrontmatter がエラーにする。ブロックで書いたキーは data に入らない（呼び出し側でエラーにしてある）。
  */
 function readTags(data: Record<string, FrontmatterValue>, errors: string[]): string[] | undefined {
-  const tags = data[TAGS_KEY];
-  if (tags === undefined) return undefined;
+  return readStringList(data[TAGS_KEY], TAGS_RULE, errors);
+}
 
-  if (!Array.isArray(tags)) {
-    errors.push("tags は 1 行のリストで書く（例: tags: [aws, TypeScript]）");
+/** 1 行のリストで書く値を rule で検査して読む。書いていないか問題があれば undefined。問題は errors に足す */
+function readStringList(value: FrontmatterValue | undefined, rule: StringListRule, errors: string[]): string[] | undefined {
+  if (value === undefined) return undefined;
+
+  if (!Array.isArray(value)) {
+    errors.push(`${rule.key} は 1 行のリストで書く（例: ${rule.key}: [${rule.example}]）`);
     return undefined;
   }
 
-  const normalizedTags = tags.map((tag) => tag.normalize("NFC"));
-  const problem = findTagsProblem(normalizedTags);
-  if (problem === undefined) return normalizedTags;
+  const items = rule.normalize === undefined ? value : value.map(rule.normalize);
+  const problem = findStringListProblem(items, rule);
+  if (problem === undefined) return items;
 
   errors.push(problem);
   return undefined;
 }
 
-/** NFC に正規化したタグの並びの問題を 1 つ返す。問題が無ければ undefined */
-function findTagsProblem(tags: string[]): string | undefined {
-  if (tags.length > MAX_TAGS) return `tags は ${MAX_TAGS} 個まで`;
-  if (tags.some((tag) => [...tag].length > MAX_TAG_LENGTH)) return `tags の 1 個は ${MAX_TAG_LENGTH} 文字まで`;
-  if (tags.some((tag) => TAG_FORBIDDEN.test(tag))) return "tags の 1 個に空白、「,」、「/」を含めない";
-  if (new Set(tags).size !== tags.length) return "tags に同じタグが 2 回以上あります";
+/** リストの問題を 1 つ返す（個数、長さ、使えない文字、重複の順に見る）。問題が無ければ undefined */
+function findStringListProblem(items: string[], { key, maxItems, maxLength, itemName, forbidden }: StringListRule): string | undefined {
+  if (items.length > maxItems) return `${key} は ${maxItems} 個まで`;
+  if (items.some((item) => [...item].length > maxLength)) return `${key} の 1 個は ${maxLength} 文字まで`;
+  if (forbidden !== undefined && items.some((item) => forbidden.pattern.test(item))) {
+    return `${key} の 1 個に${forbidden.description}を含めない`;
+  }
+  if (new Set(items).size !== items.length) return `${key} に同じ${itemName}が 2 回以上あります`;
   return undefined;
 }
 
@@ -480,28 +523,9 @@ function readWorkFields(data: Record<string, FrontmatterValue>, errors: string[]
   return fields;
 }
 
-/** 作品の tech を読む。書いていないか問題があれば空。問題は errors に足す */
+/** 作品の tech を読む（TECH_RULE）。書いていないか問題があれば空。問題は errors に足す */
 function readTech(tech: FrontmatterValue | undefined, errors: string[]): string[] {
-  if (tech === undefined) return [];
-
-  if (!Array.isArray(tech)) {
-    errors.push("tech は 1 行のリストで書く（例: tech: [TypeScript, Node.js]）");
-    return [];
-  }
-
-  const problem = findTechProblem(tech);
-  if (problem === undefined) return tech;
-
-  errors.push(problem);
-  return [];
-}
-
-/** tech のリストの問題を 1 つ返す。問題が無ければ undefined */
-function findTechProblem(tech: string[]): string | undefined {
-  if (tech.length > MAX_TECH_ITEMS) return `tech は ${MAX_TECH_ITEMS} 個まで`;
-  if (tech.some((item) => [...item].length > MAX_TECH_LENGTH)) return `tech の 1 個は ${MAX_TECH_LENGTH} 文字まで`;
-  if (new Set(tech).size !== tech.length) return "tech に同じ語が 2 回以上あります";
-  return undefined;
+  return readStringList(tech, TECH_RULE, errors) ?? [];
 }
 
 function isRepositoryUrl(value: FrontmatterValue): value is string {
