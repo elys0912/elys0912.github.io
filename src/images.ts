@@ -105,7 +105,7 @@ function imageKeyOf(src: string): string | undefined {
   const hasQueryOrFragment = /[?#]/.test(decoded);
   if (hasDotSegment || hasQueryOrFragment) return undefined;
 
-  // 拾わなかった参照は、書き出した後の checkSiteResources（src/build.ts）で out/ に無いものとしてビルドを止める
+  // 拾わなかった参照は、書き出した後の checkSiteResources（src/check-resources.ts）で out/ に無いものとしてビルドを止める
   if (UNSAFE_IMAGE_PATH_CHAR.test(decoded)) return undefined;
 
   return `${slug}/${fileName}`;
