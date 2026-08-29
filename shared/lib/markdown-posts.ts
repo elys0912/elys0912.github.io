@@ -141,47 +141,56 @@ export function parseFrontmatter(text: string): ParsedMarkdown | string {
   if (end < 0) return "frontmatter の閉じの --- がありません";
 
   const lines = all.slice(1, end);
-  // Map で集めて最後にオブジェクトにする（__proto__ のようなキーも、自前のプロパティとして残すため）
-  const data = new Map<string, FrontmatterValue>();
-  const blockKeys: string[] = [];
-  const seen = new Set<string>();
-  const errors: string[] = [];
-  // ブロックの中にいる間だけある
-  let block: Block | undefined;
-  lines.forEach((line, index) => {
-    const where = `frontmatter の ${index + 2} 行目`;
-    if (FORBIDDEN_CHARACTER.test(line)) {
-      errors.push(`${where}: 制御文字など、使えない文字があります`);
-      block = undefined;
-      return;
-    }
-    if (block && acceptBlockLine(block, line, where, errors)) return;
-    // インデントの無い行でブロックは終わる。この行は最上位の行として続けて読む
-    block = undefined;
-    if (/^ *$/.test(line) || line.startsWith("#")) return;
-    if (line.startsWith(" ") || line.startsWith("\t")) {
-      errors.push(`${where}: インデントした行は読めません（キーは行頭から書く）: ${line.trim()}`);
-      return;
-    }
-    const match = KEY_LINE.exec(line);
-    if (!match) {
-      errors.push(`${where}: 「key: value」の形で読めません（コロンの後に空白を入れる）: ${line}`);
-      return;
-    }
-    const [, key, value = ""] = match;
-    if (seen.has(key)) errors.push(`${where}: ${key} が 2 回以上あります`);
-    seen.add(key);
-    if (BLOCK_HEADER.test(value)) {
-      blockKeys.push(key);
-      block = {};
-      return;
-    }
-    const scalar = parseScalar(value);
-    if (typeof scalar === "object" && !Array.isArray(scalar)) errors.push(`${where}: ${key} の${scalar.reason}`);
-    else data.set(key, scalar);
-  });
-  if (errors.length > 0) return errors.join(" / ");
-  return { data: Object.fromEntries(data), blockKeys, lines, body: all.slice(end + 1).join("\n") };
+  const state: FrontmatterState = { data: new Map(), blockKeys: [], seen: new Set(), errors: [], block: undefined };
+  lines.forEach((line, index) => readFrontmatterLine(line, `frontmatter の ${index + 2} 行目`, state));
+  if (state.errors.length > 0) return state.errors.join(" / ");
+
+  return { data: Object.fromEntries(state.data), blockKeys: state.blockKeys, lines, body: all.slice(end + 1).join("\n") };
+}
+
+/** parseFrontmatter が frontmatter の行を読みながら更新する状態 */
+type FrontmatterState = {
+  /** Map で集めて最後にオブジェクトにする（__proto__ のようなキーも、自前のプロパティとして残すため） */
+  data: Map<string, FrontmatterValue>;
+  blockKeys: string[];
+  seen: Set<string>;
+  errors: string[];
+  /** ブロックの中にいる間だけある */
+  block: Block | undefined;
+};
+
+/** frontmatter の 1 行を読み、state を更新する。where はエラーの文言に付ける行の位置 */
+function readFrontmatterLine(line: string, where: string, state: FrontmatterState): void {
+  const { errors } = state;
+  if (FORBIDDEN_CHARACTER.test(line)) {
+    errors.push(`${where}: 制御文字など、使えない文字があります`);
+    state.block = undefined;
+    return;
+  }
+  if (state.block && acceptBlockLine(state.block, line, where, errors)) return;
+  // インデントの無い行でブロックは終わる。この行は最上位の行として続けて読む
+  state.block = undefined;
+  if (/^ *$/.test(line) || line.startsWith("#")) return;
+  if (line.startsWith(" ") || line.startsWith("\t")) {
+    errors.push(`${where}: インデントした行は読めません（キーは行頭から書く）: ${line.trim()}`);
+    return;
+  }
+  const match = KEY_LINE.exec(line);
+  if (!match) {
+    errors.push(`${where}: 「key: value」の形で読めません（コロンの後に空白を入れる）: ${line}`);
+    return;
+  }
+  const [, key, value = ""] = match;
+  if (state.seen.has(key)) errors.push(`${where}: ${key} が 2 回以上あります`);
+  state.seen.add(key);
+  if (BLOCK_HEADER.test(value)) {
+    state.blockKeys.push(key);
+    state.block = {};
+    return;
+  }
+  const scalar = parseScalar(value);
+  if (typeof scalar === "object" && !Array.isArray(scalar)) errors.push(`${where}: ${key} の${scalar.reason}`);
+  else state.data.set(key, scalar);
 }
 
 /** ブロック（`|` や `>`）の続きの行を読む状態。indent は最初の行のインデント（最初の行を読むまでは undefined） */
