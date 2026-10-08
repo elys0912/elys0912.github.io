@@ -1,0 +1,13 @@
+/* フッターのリンク（SiteFooter.module.css の .inner a）と同じ見た目にする */
+.button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--yellow);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  text-decoration: underline;
+}
