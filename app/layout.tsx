@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
+import { FooterBackButton } from "@/components/FooterBackButton";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { formatDate } from "@/lib/format";
 import { buildPageMetadata } from "@/lib/metadata";
-import { AUTHOR_NAME, FOOTER_LINKS, NAV_ITEMS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import {
+  AUTHOR_NAME,
+  FOOTER_LINKS,
+  HISTORY_BACK_LABEL,
+  NAV_ITEMS,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_URL,
+} from "@/lib/site";
 import "./globals.css";
 import styles from "./layout.module.css";
 
@@ -39,6 +48,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               </a>
             </span>
           ))}
+          {/* TODO: portfolio の独自ドメインができたら、FOOTER_LINKS に portfolio へのリンクを足してこれを外す */}
+          <FooterBackButton label={HISTORY_BACK_LABEL} />
         </SiteFooter>
       </body>
     </html>

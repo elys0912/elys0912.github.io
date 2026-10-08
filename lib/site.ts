@@ -31,3 +31,9 @@ export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
     label: "記事のライセンス",
   },
 ];
+
+/**
+ * フッターの「前のページへ戻る」の文言。portfolio へ戻る仮の導線（components/FooterBackButton.tsx）。
+ * TODO: portfolio の独自ドメインができたら、FOOTER_LINKS に portfolio へのリンクを足し、これとボタンを消す
+ */
+export const HISTORY_BACK_LABEL = "前のページへ戻る";
