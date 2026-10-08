@@ -2,10 +2,17 @@
 // node:fs を使うので、ビルド時・開発サーバーのサーバー側からだけ使い、クライアントのコンポーネントから import しないこと。
 //
 // ファイルの形式:
-// - 1 記事 1 ファイル（<slug>.md）。ディレクトリの直下に .md だけを置く（. で始まる名前は読まない）
+// - 1 記事 1 ファイル（<slug>.md）。ディレクトリの直下に .md だけを置く。. で始まる .md は読まずにエラーにする
+//   （.gitkeep のような .md でない . で始まるファイルは対象外で、黙って読まない）
+// - UTF-8 で書く（BOM は取り除く）
 // - 先頭の `---` で囲んだ frontmatter に title、summary、publishedAt（オフセット付きの ISO 8601）を書く。
-//   draft: true は下書き。marp: true はスライドの記事
+//   draft: true は下書き。marp: true はスライドの記事で、Marp の指定（theme など）はこのときだけ書ける
+// - frontmatter は YAML のうち、parseFrontmatter の規則の範囲だけを読む。範囲の外の書き方は推測せず、エラーにする
+//   （例: draft:true、Draft: true、インデントした draft: true を、下書きと読み損ねて公開しないため）
 // 読めないファイルは理由を warn に渡してスキップする（ビルドを止めたいときは、warn で例外を投げる）。
+//
+// 同じ入力に対する判定を API の取り込み側の検証とそろえている。そろっていることを確かめるケースは
+// markdown-posts.cases.json にあり、テストがそれを流す。
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -14,8 +21,10 @@ import type { PostContent } from "./post-types";
 type FrontmatterValue = string | boolean;
 
 export interface ParsedMarkdown {
-  /** 読めたキーと値。引用符付きの文字列、true / false、素の文字列だけを扱う */
+  /** 1 行で書いた値。引用符付きの文字列、真偽値、素の文字列 */
   data: Record<string, FrontmatterValue>;
+  /** ブロック（`|` や `>`）で書いたキー。値は読まない（Marp の記事では、行をそのまま本文の先頭に残す） */
+  blockKeys: string[];
   /** frontmatter の中の行（区切りの `---` を除く）。Marp の記事で本文の先頭に残すために使う */
   lines: string[];
   /** 閉じの `---` の次の行から末尾まで */
@@ -24,76 +33,160 @@ export interface ParsedMarkdown {
 
 /** frontmatter から取り除くキー。Marp の記事では、これ以外の行を本文の先頭に残す */
 const POST_KEYS = new Set(["title", "summary", "publishedAt", "draft"]);
+const MARP_KEY = "marp";
+/** Marp の記事（marp: true）にだけ書けるキー（Marp のグローバルディレクティブ） */
+const MARP_DIRECTIVE_KEYS = new Set(["theme", "paginate", "class", "style", "header", "footer", "size", "math"]);
+const KNOWN_KEYS = [...POST_KEYS, MARP_KEY, ...MARP_DIRECTIVE_KEYS];
+const MAX_TITLE_LENGTH = 200;
+const MAX_SUMMARY_LENGTH = 500;
 
 const DELIMITER = "---";
 const MARKDOWN_SUFFIX = ".md";
-const TOP_LEVEL_KEY = /^([A-Za-z_][\w-]*):(?:\s+(.*))?$/;
-/** オフセット付きの ISO 8601（Z か +09:00 のような時差が必須） */
-const OFFSET_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** 最上位の `key: value` の行。コロンの後は空白（タブは不可）か行末 */
+const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_-]*):(?: +(.*))?$/;
+/** 使えない文字（制御文字、YAML が改行とみなす文字、BOM など） */
+const FORBIDDEN_CHARACTER = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u2028\u2029\uFEFF\uFFFE\uFFFF]/;
+/** 1 行の "…"。エスケープは \" と \\ だけ。後ろには空白と # からのコメントだけを置ける */
+const DOUBLE_QUOTED = /^"((?:[^"\\]|\\["\\])*)"(?: +#.*)? *$/;
+/** 1 行の '…'。'' は ' 1 字 */
+const SINGLE_QUOTED = /^'((?:[^']|'')*)'(?: +#.*)? *$/;
+/** ブロックの始まり（| か >。+ か - の指定と、後ろのコメントは可。インデントの数の指定は不可） */
+const BLOCK_HEADER = /^[|>][+-]?(?: +#.*)? *$/;
+/** YAML の記号で始まり、文字列として読まれない値 */
+const SPECIAL_START = /^(?:[[\]{}&*!%@`,|>'"\t]|[-?:](?:[ \t]|$)|<<$)/;
+/** YAML が数値（や日付）として読みうる値。少しでも疑わしいものはまとめて弾く */
+const NUMBER_LIKE = /^[-+]?(?:\.?[0-9][0-9a-fA-FxX_.:+-]*|\.(?:inf|Inf|INF|nan|NaN|NAN))$/;
+const NULLS = new Set(["~", "null", "Null", "NULL"]);
+/** YAML 1.1 の真偽値として読まれる語（これ以外の綴りは文字列） */
+const BOOLEANS = new Map<string, boolean>([
+  ...["true", "True", "TRUE", "yes", "Yes", "YES", "on", "On", "ON"].map((word): [string, boolean] => [word, true]),
+  ...["false", "False", "FALSE", "no", "No", "NO", "off", "Off", "OFF"].map((word): [string, boolean] => [word, false]),
+]);
+/** オフセット付きの ISO 8601（Z か +09:00 のような時差が必須。秒と小数 9 桁までは省略可） */
+const OFFSET_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+/** 空白とみなす文字（title と summary が空白だけかどうかの判定に使う） */
+const BLANK = /^[\t \u1680\u2000-\u2006\u2008-\u200A\u205F\u3000]*$/;
 
 /**
- * 先頭の `---` で囲んだ frontmatter を読む最小のパーサー。先頭の行が `---` でない、
- * または閉じの `---` が無ければ undefined。BOM は取り除き、改行は LF にそろえる。
- * 最上位の `key: value` の行だけを読み、値が空のキー、ブロック（`|`、`>`）、インデントした行は読まない。
+ * 先頭の `---` で囲んだ frontmatter を読む。BOM は取り除き、改行は LF にそろえる。
+ * 読めなければ理由の文字列を返す。frontmatter の行は次のどれかであること:
+ * - 空の行（空白だけも可）、行頭が `#` のコメント
+ * - 行頭から書いた `key: value`（key は英字か _ で始まり、英数字、_、- が続く）。同じキーは 1 回だけ
+ *   - value は `"…"`（エスケープは `\"` と `\\` だけ）、`'…'`、素の文字列、真偽値（true / false / yes / no / on / off。
+ *     先頭だけ大文字、全部大文字も可）のどれか。後ろの ` # …` はコメント
+ *   - 素の文字列は、空、null（`~` を含む）、数値や日付に見えるもの、YAML の記号で始まるもの、`: ` を含むものは不可（引用符で囲む）
+ *   - value が `|` か `>`（`+` か `-` を付けても可）のときはブロック。続く行は、空白で 1 段以上インデントし、
+ *     インデントを最初の行より浅くしない。最初の行の前に空白だけの行を置かない
+ * - それ以外（`key:value`、インデントした行、タブで始まる行、制御文字を含む行など）はエラー
  */
-export function parseFrontmatter(text: string): ParsedMarkdown | undefined {
-  const normalized = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+export function parseFrontmatter(text: string): ParsedMarkdown | string {
+  const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
   const all = normalized.split("\n");
-  if (all[0] !== DELIMITER) return undefined;
+  if (all[0] !== DELIMITER) return "先頭に --- で囲んだ frontmatter がありません";
   const end = all.indexOf(DELIMITER, 1);
-  if (end < 0) return undefined;
+  if (end < 0) return "frontmatter の閉じの --- がありません";
 
   const lines = all.slice(1, end);
-  const data: Record<string, FrontmatterValue> = {};
-  for (const line of lines) {
-    const match = TOP_LEVEL_KEY.exec(line);
-    if (!match) continue;
-    const value = parseScalar(match[2] ?? "");
-    if (value !== undefined) data[match[1]] = value;
-  }
-  return { data, lines, body: all.slice(end + 1).join("\n") };
+  // Map で集めて最後にオブジェクトにする（__proto__ のようなキーも、自前のプロパティとして残すため）
+  const data = new Map<string, FrontmatterValue>();
+  const blockKeys: string[] = [];
+  const seen = new Set<string>();
+  const errors: string[] = [];
+  // ブロックの中にいる間は、そのインデント（最初の行を読むまでは undefined）
+  let block: { indent?: number } | undefined;
+  lines.forEach((line, index) => {
+    const where = `frontmatter の ${index + 2} 行目`;
+    if (FORBIDDEN_CHARACTER.test(line)) {
+      errors.push(`${where}: 制御文字など、使えない文字があります`);
+      block = undefined;
+      return;
+    }
+    if (block) {
+      if (line === "") return;
+      const indent = /^ */.exec(line)![0].length;
+      if (indent === line.length) {
+        if (block.indent === undefined) errors.push(`${where}: ブロックの最初の行の前に、空白だけの行を置かない`);
+        return;
+      }
+      if (indent > 0) {
+        if (block.indent === undefined) block.indent = indent;
+        else if (indent < block.indent) errors.push(`${where}: ブロックの行のインデントが最初の行より浅い`);
+        return;
+      }
+      block = undefined;
+    }
+    if (/^ *$/.test(line) || line.startsWith("#")) return;
+    if (line.startsWith(" ") || line.startsWith("\t")) {
+      errors.push(`${where}: インデントした行は読めません（キーは行頭から書く）: ${line.trim()}`);
+      return;
+    }
+    const match = KEY_LINE.exec(line);
+    if (!match) {
+      errors.push(`${where}: 「key: value」の形で読めません（コロンの後に空白を入れる）: ${line}`);
+      return;
+    }
+    const [, key, value = ""] = match;
+    if (seen.has(key)) errors.push(`${where}: ${key} が 2 回以上あります`);
+    seen.add(key);
+    if (BLOCK_HEADER.test(value)) {
+      blockKeys.push(key);
+      block = {};
+      return;
+    }
+    const scalar = parseScalar(value);
+    if (typeof scalar === "object") errors.push(`${where}: ${key} の${scalar.reason}`);
+    else data.set(key, scalar);
+  });
+  if (errors.length > 0) return errors.join(" / ");
+  return { data: Object.fromEntries(data), blockKeys, lines, body: all.slice(end + 1).join("\n") };
 }
 
-function parseScalar(raw: string): FrontmatterValue | undefined {
-  const value = raw.trim();
-  const double = /^"((?:[^"\\]|\\.)*)"\s*(?:#.*)?$/.exec(value);
-  if (double) {
-    try {
-      return JSON.parse(`"${double[1]}"`) as string;
-    } catch {
-      return double[1];
-    }
+function parseScalar(value: string): FrontmatterValue | { reason: string } {
+  if (value.startsWith('"')) {
+    const double = DOUBLE_QUOTED.exec(value);
+    if (double) return double[1].replace(/\\(["\\])/g, "$1");
+    return { reason: `"…" を読めません（1 行で閉じる。エスケープは \\" と \\\\ だけ。後ろにはコメントだけを置ける）` };
   }
-  const single = /^'((?:[^']|'')*)'\s*(?:#.*)?$/.exec(value);
-  if (single) return single[1].replace(/''/g, "'");
-
-  // 素の文字列は、空白の後の # から行末までをコメントとして除く
-  const plain = value.replace(/(?:^|\s+)#.*$/, "").trim();
-  if (plain === "" || plain.startsWith("|") || plain.startsWith(">")) return undefined;
-  if (plain === "true" || plain === "True" || plain === "TRUE") return true;
-  if (plain === "false" || plain === "False" || plain === "FALSE") return false;
-  return plain;
+  if (value.startsWith("'")) {
+    const single = SINGLE_QUOTED.exec(value);
+    if (single) return single[1].replace(/''/g, "'");
+    return { reason: "'…' を読めません（1 行で閉じる。後ろにはコメントだけを置ける）" };
+  }
+  // 空白（タブを含む）の後の # から行末まではコメント
+  const plain = value.replace(/(?:^|[ \t]+)#.*$/, "").replace(/[ \t]+$/, "");
+  if (plain === "" || NULLS.has(plain)) return { reason: "値が空です（null は使わない）" };
+  if (SPECIAL_START.test(plain)) return { reason: `値が YAML の記号で始まります。文字列なら引用符で囲む: ${plain}` };
+  if (/:(?:[ \t]|$)/.test(plain)) return { reason: `値に「: 」があります。文字列なら引用符で囲む: ${plain}` };
+  if (NUMBER_LIKE.test(plain)) return { reason: `値が数値や日付として読まれます。文字列なら引用符で囲む: ${plain}` };
+  return BOOLEANS.get(plain) ?? plain;
 }
 
 /**
  * ディレクトリの直下の *.md を読み、記事の配列にして返す（並びはファイル名順）。
  * 下書きと未来の publishedAt も含める（出すかどうかは呼び出し側で決める）。
- * ディレクトリが無ければ空の配列。読めないファイルは理由を warn に渡してスキップする。
+ * ディレクトリが無ければ空の配列。読めないファイルと . で始まる .md は、理由を warn に渡してスキップする。
  */
 export function loadPostDirectory(dir: string, warn: (message: string) => void = console.warn): PostContent[] {
   if (!isDirectory(dir)) return [];
   const dirName = path.basename(dir);
   const posts: PostContent[] = [];
   for (const name of readdirSync(dir).sort()) {
-    if (name.startsWith(".")) continue;
     const label = `${dirName}/${name}`;
+    if (name.startsWith(".")) {
+      // 黙って読み飛ばすと、公開したつもりの記事が出ない・下書きの印が読まれないまま気づけないので、.md はエラーにする
+      if (name.endsWith(MARKDOWN_SUFFIX)) {
+        warn(`[markdown-posts] ${label} を読みません: . で始まる .md は置かない（下書きは draft: true にする）`);
+      }
+      continue;
+    }
     const file = path.join(dir, name);
     if (!name.endsWith(MARKDOWN_SUFFIX) || !statSync(file).isFile()) {
       warn(`[markdown-posts] ${label} を読みません: ${dirName}/ には .md のファイルだけを置く`);
       continue;
     }
     const slug = name.slice(0, -MARKDOWN_SUFFIX.length);
-    const result = parsePost(readFileSync(file, "utf8"), slug);
+    const result = parsePost(readFileSync(file), slug);
     if (typeof result === "string") {
       warn(`[markdown-posts] ${label} をスキップしました: ${result}`);
     } else {
@@ -104,25 +197,61 @@ export function loadPostDirectory(dir: string, warn: (message: string) => void =
 }
 
 /** 1 ファイル分を記事にする。読めなければ理由の文字列を返す */
-function parsePost(text: string, slug: string): PostContent | string {
-  const parsed = parseFrontmatter(text);
-  if (!parsed) return "先頭に --- で囲んだ frontmatter がありません";
-  const { data, lines, body } = parsed;
-
-  const { title, summary, publishedAt, draft = false, marp = false } = data;
-  if (typeof title !== "string") return "title がありません";
-  if (typeof summary !== "string") return "summary がありません";
-  if (typeof publishedAt !== "string") return "publishedAt がありません";
-  if (!OFFSET_DATE_TIME.test(publishedAt) || Number.isNaN(Date.parse(publishedAt))) {
-    return `publishedAt をオフセット付きの ISO 8601 として読めません（例: 2026-10-10T09:00:00+09:00）: ${publishedAt}`;
+function parsePost(bytes: Uint8Array, slug: string): PostContent | string {
+  let text: string;
+  try {
+    // BOM は parseFrontmatter が 1 つだけ取り除く（ここでも取り除くと、BOM が 2 つあるファイルを読めてしまう）
+    text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    return "UTF-8 として読めません";
   }
-  if (typeof draft !== "boolean") return "draft は true か false で書く";
-  if (typeof marp !== "boolean") return "marp は true か false で書く";
+  const parsed = parseFrontmatter(text);
+  if (typeof parsed === "string") return parsed;
+  const { data, blockKeys, lines, body } = parsed;
 
-  const publishedAtUtc = new Date(publishedAt).toISOString();
-  // Marp の記事は、title などを除いた frontmatter を本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）
-  const kept = lines.filter((line) => !POST_KEYS.has(TOP_LEVEL_KEY.exec(line)?.[1] ?? ""));
-  const bodyMarkdown = marp ? [DELIMITER, ...kept, DELIMITER, body].join("\n") : body;
+  const errors: string[] = [];
+  const keys = [...Object.keys(data), ...blockKeys];
+  for (const key of keys) {
+    if (KNOWN_KEYS.includes(key)) continue;
+    const known = KNOWN_KEYS.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
+    errors.push(
+      known ? `${key} は読めません（${known} と大文字小文字が違う）` : `${key} は読めません（書けるキーは ${KNOWN_KEYS.join("、")}）`,
+    );
+  }
+  for (const key of blockKeys) {
+    if (POST_KEYS.has(key) || key === MARP_KEY) errors.push(`${key} はブロック（| や >）にせず 1 行で書く`);
+  }
+
+  // ブロックで書いたキーは上でエラーにしたので、「ありません」は重ねない
+  const missing = (key: string) => !Object.hasOwn(data, key) && !blockKeys.includes(key);
+  const { title, summary, publishedAt, draft = false, marp = false } = data;
+  checkText("title", title, MAX_TITLE_LENGTH, missing("title"), errors);
+  checkText("summary", summary, MAX_SUMMARY_LENGTH, missing("summary"), errors);
+  const publishedAtUtc = typeof publishedAt === "string" ? toUtc(publishedAt) : undefined;
+  if (missing("publishedAt")) errors.push("publishedAt がありません");
+  else if (publishedAt !== undefined && publishedAtUtc === undefined) {
+    errors.push(`publishedAt をオフセット付きの ISO 8601 として読めません（例: 2026-10-10T09:00:00+09:00）: ${publishedAt}`);
+  }
+  if (typeof draft !== "boolean") errors.push("draft は true か false で書く");
+  if (typeof marp !== "boolean") errors.push("marp は true か false で書く");
+  if (marp !== true) {
+    const directives = keys.filter((key) => MARP_DIRECTIVE_KEYS.has(key));
+    if (directives.length > 0) errors.push(`${directives.join("、")} は Marp の記事（marp: true）にだけ書ける`);
+  }
+  // 型の絞り込みのための条件（errors が空なら、title と summary は文字列、publishedAtUtc はある）
+  if (errors.length > 0 || typeof title !== "string" || typeof summary !== "string" || publishedAtUtc === undefined) {
+    return errors.join(" / ");
+  }
+
+  // Marp の記事は、title などを除いた frontmatter を本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）。
+  // yes / on などで書いた真偽値は true / false に書き直す
+  const kept = lines.flatMap((line) => {
+    const key = KEY_LINE.exec(line)?.[1];
+    if (key !== undefined && POST_KEYS.has(key)) return [];
+    const value = key !== undefined && Object.hasOwn(data, key) ? data[key] : undefined;
+    return typeof value === "boolean" ? [`${key}: ${value}`] : [line];
+  });
+  const bodyMarkdown = marp === true ? [DELIMITER, ...kept, DELIMITER, body].join("\n") : body;
   return {
     slug,
     title,
@@ -130,8 +259,38 @@ function parsePost(text: string, slug: string): PostContent | string {
     bodyMarkdown,
     publishedAt: publishedAtUtc,
     updatedAt: publishedAtUtc,
-    ...(draft ? { draft } : {}),
+    ...(draft === true ? { draft } : {}),
   };
+}
+
+/** 必須の文字列。空白だけは不可、長さはコードポイントで数える */
+function checkText(
+  key: string,
+  value: FrontmatterValue | undefined,
+  maxLength: number,
+  missing: boolean,
+  errors: string[],
+): void {
+  if (missing) errors.push(`${key} がありません`);
+  else if (value === undefined) return;
+  else if (typeof value !== "string" || BLANK.test(value)) errors.push(`${key} は空でない文字列で書く`);
+  else if ([...value].length > maxLength) errors.push(`${key} は ${maxLength} 文字まで`);
+}
+
+/** オフセット付きの ISO 8601 を UTC の ISO 文字列にする。暦に無い日時（2 月 30 日、24 時など）は undefined */
+function toUtc(value: string): string | undefined {
+  const match = OFFSET_DATE_TIME.exec(value);
+  if (!match) return undefined;
+  // 省略した秒と時差（Z）は 0
+  const [year, month, day, hour, minute, second, offsetHour, offsetMinute] = match.slice(1).map((part) => Number(part ?? 0));
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+  if (days === undefined || day < 1 || day > days) return undefined;
+  if (hour > 23 || minute > 59 || second > 59 || offsetMinute > 59 || offsetHour * 60 + offsetMinute > 18 * 60) {
+    return undefined;
+  }
+  const time = new Date(value);
+  return Number.isNaN(time.getTime()) ? undefined : time.toISOString();
 }
 
 function isDirectory(dir: string): boolean {

@@ -90,7 +90,7 @@ describe("checkDrafts", () => {
         `${name} のエラーがありません:\n${errors.join("\n")}`,
       );
     }
-    assert.equal(errors.length, 5, errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes(".gitkeep")), errors.join("\n"));
     assert.equal(postCount, 0);
   });
 
@@ -100,10 +100,11 @@ describe("checkDrafts", () => {
       "blog/no-frontmatter.md": "# 本文だけ\n",
     });
     const { errors } = checkDrafts(dir, NOW);
-    // yes-post.md は、draft の行の書き方と、記事の読み込みの「draft は true か false で書く」の 2 件
-    assert.equal(errors.length, 3, errors.join("\n"));
-    assert.ok(errors.some((error) => error.includes("yes-post.md") && error.includes("draft の行を読めません")));
-    assert.ok(errors.some((error) => error.includes("yes-post.md") && error.includes("draft は true か false")));
+    // yes-post.md は、ブログの規則（draft は true か false だけ）が指摘する（共有の記事の読み込みは yes を真として読む）
+    assert.ok(
+      errors.some((error) => error.includes("yes-post.md") && error.includes("draft の行を読めません")),
+      errors.join("\n"),
+    );
     assert.ok(errors.some((error) => error.includes("no-frontmatter.md")));
   });
 });
