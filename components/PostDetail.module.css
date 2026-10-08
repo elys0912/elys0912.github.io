@@ -1,0 +1,291 @@
+/*
+ * PC は本文（左）と目次（右、220px、sticky）の 2 列。目次は本文の高さいっぱいの列に置き、
+ * 900px 以下では 1 列にして、目次を見出しと本文のあいだに入れる。
+ */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "header"
+    "content";
+}
+
+.layout.withToc {
+  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "header aside"
+    "content aside";
+  column-gap: 48px;
+}
+
+.header {
+  grid-area: header;
+  margin-bottom: 32px;
+}
+
+.aside {
+  grid-area: aside;
+}
+
+.aside > * {
+  position: sticky;
+  top: 24px;
+}
+
+.content {
+  grid-area: content;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .layout.withToc {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      "header"
+      "aside"
+      "content";
+  }
+
+  .aside {
+    margin-bottom: 32px;
+  }
+
+  .aside > * {
+    position: static;
+  }
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  list-style: none;
+}
+
+.breadcrumb li + li::before {
+  content: "／";
+  margin-right: 8px;
+}
+
+.breadcrumb a {
+  color: var(--yellow);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* 下書きの印。一覧と同じ灰の破線枠 */
+.draft {
+  padding: 0 8px;
+  border: 1px dashed var(--muted);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.title {
+  margin: 4px 0 8px;
+  font-size: 1.75rem;
+}
+
+.summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.0625rem;
+}
+
+/* 主ボタン（黄地に黒字）。1 ページに 1 つだけ */
+.primaryButton {
+  display: inline-block;
+  margin-top: 24px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: var(--yellow);
+  color: #111;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.primaryButton:hover {
+  background: #fff04d;
+}
+
+.footer {
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.back {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+
+/* 記事本文（Markdown から変換した HTML） */
+.body {
+  margin-bottom: 40px;
+  /* 長い URL などでスマホ幅から横にはみ出さないようにする */
+  overflow-wrap: anywhere;
+}
+
+.body > :first-child {
+  margin-top: 0;
+}
+
+/* 本文の見出しは h2 から始まる（lib/markdown.ts で1段下げている） */
+.body h2,
+.body h3,
+.body h4,
+.body h5,
+.body h6 {
+  margin: 2em 0 0.75em;
+}
+
+.body h2 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+  font-size: 1.375rem;
+  /* 目次から飛んだときに、見出しが画面の端に貼り付かないようにする */
+  scroll-margin-top: 24px;
+}
+
+.body h3 {
+  font-size: 1.25rem;
+}
+
+.body h4 {
+  font-size: 1.125rem;
+}
+
+.body h5,
+.body h6 {
+  font-size: 1rem;
+}
+
+.body p,
+.body ul,
+.body ol,
+.body blockquote,
+.body pre,
+.body table {
+  margin: 0 0 1.25em;
+}
+
+.body ul,
+.body ol {
+  padding-left: 1.5em;
+}
+
+.body li + li {
+  margin-top: 0.25em;
+}
+
+.body li > ul,
+.body li > ol {
+  margin: 0.25em 0 0;
+}
+
+.body blockquote {
+  padding: 0 1em;
+  border-left: 4px solid var(--border);
+  color: var(--muted);
+}
+
+.body blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.body a {
+  color: var(--yellow);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.body hr {
+  margin: 2em 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.body code {
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+.body pre {
+  padding: 16px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  line-height: 1.5;
+}
+
+/* コードブロックは折り返さず、横スクロールで読む */
+.body pre code {
+  padding: 0;
+  background: none;
+  font-size: 0.875rem;
+  overflow-wrap: normal;
+}
+
+/* 列の多い表は、表だけを横スクロールさせてページ全体をはみ出させない */
+.body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  /* 本文の overflow-wrap: anywhere を表には効かせない（列幅が縮んで単語の途中で折れるため） */
+  overflow-wrap: normal;
+}
+
+.body th,
+.body td {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+}
+
+.body th {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.body th[align="center"],
+.body td[align="center"] {
+  text-align: center;
+}
+
+.body th[align="right"],
+.body td[align="right"] {
+  text-align: right;
+}

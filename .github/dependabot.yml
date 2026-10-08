@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      next:
+        patterns: ['next', 'eslint-config-next', 'react', 'react-dom', '@types/react*']
+    ignore:
+      # 実行環境の Node 24 に型定義をそろえる
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      # typescript-eslint が TS 7 に未対応
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # eslint-config-next（eslint-plugin-react）が ESLint 10 に未対応
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

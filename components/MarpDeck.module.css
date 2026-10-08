@@ -1,0 +1,13 @@
+.deck {
+  margin-bottom: 48px;
+}
+
+/* スライドは 16:9 の SVG。横幅いっぱいに縮めて、縦に並べる */
+.deck :global(div.marpit) > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}

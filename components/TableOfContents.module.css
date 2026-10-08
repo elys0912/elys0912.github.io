@@ -1,0 +1,64 @@
+/* PC: 本文の右に縦に並べ、スクロールしても残す（sticky は PostDetail.module.css の .aside 側） */
+.toc {
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
+  font-size: 0.8125rem;
+}
+
+.heading {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+.list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list a {
+  display: block;
+  padding: 2px 0;
+  color: var(--muted);
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.list a:hover {
+  color: var(--foreground);
+}
+
+/* 現在地は黄 */
+.list a[aria-current] {
+  color: var(--yellow);
+}
+
+/* 900px 以下: 本文の上に、横に並んだチップとして畳む */
+@media (max-width: 900px) {
+  .toc {
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+
+  .list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .list a {
+    padding: 2px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--background-2);
+  }
+
+  .list a[aria-current] {
+    border-color: var(--yellow);
+  }
+}
