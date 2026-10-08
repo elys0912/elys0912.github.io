@@ -134,8 +134,14 @@ describe("readPosts（記事の読み込みがすり抜ける書き方）", () =
       posts.map((p) => p.slug),
       ["ok-post"],
     );
-    assert.equal(problems.length, 3, problems.join("\n"));
-    assert.ok(problems.every((p) => p.includes("draft の行を読めません")));
+    // ブログの規則と、共有の記事の読み込みの規則の両方が指摘する（どちらか一方が緩んでも止まる）
+    for (const name of ["no-space.md", "upper-key.md", "indented.md"]) {
+      assert.ok(
+        problems.some((p) => p.includes(`/${name}: draft の行を読めません`)),
+        `${name} の指摘がありません:\n${problems.join("\n")}`,
+      );
+    }
+    assert.ok(problems.every((p) => !p.includes("ok-post.md")), problems.join("\n"));
   });
 
   test(". で始まる名前のファイルは .gitkeep を除いて problems に入れる", () => {
@@ -143,10 +149,14 @@ describe("readPosts（記事の読み込みがすり抜ける書き方）", () =
       ".gitkeep": "",
       ".hidden.md": markdown(["publishedAt: 2026-10-01T09:00:00+09:00", "draft: true"]),
     });
-    assert.deepEqual(readPosts(dir), {
-      posts: [],
-      problems: [`${path.basename(dir)}/.hidden.md: . で始まる名前のファイルは置かない（読み込まれず、検査もすり抜ける）`],
-    });
+    const { posts, problems } = readPosts(dir);
+    assert.deepEqual(posts, []);
+    // ブログの規則と、共有の記事の読み込みの規則の両方が指摘する。.gitkeep は指摘しない
+    assert.ok(
+      problems.includes(`${path.basename(dir)}/.hidden.md: . で始まる名前のファイルは置かない（読み込まれず、検査もすり抜ける）`),
+      problems.join("\n"),
+    );
+    assert.ok(problems.every((p) => p.includes(".hidden.md")), problems.join("\n"));
   });
 
   test("Marp の記事は、frontmatter の style と HTML のコメントの指定の url(…) も画像の参照として調べる", () => {

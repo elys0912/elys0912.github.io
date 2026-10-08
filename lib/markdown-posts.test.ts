@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import { loadPostDirectory, parseFrontmatter } from "./markdown-posts.ts";
+import fixture from "./markdown-posts.cases.json" with { type: "json" };
 
 describe("parseFrontmatter", () => {
-  test("引用符付きの文字列、true / false、素の文字列を読み、本文を分ける", () => {
+  test("引用符付きの文字列、真偽値、素の文字列を読み、本文を分ける", () => {
     const parsed = parseFrontmatter(
       [
         "---",
@@ -14,13 +15,14 @@ describe("parseFrontmatter", () => {
         "summary: 'シングル''引用符'",
         "publishedAt: 2026-10-10T09:00:00+09:00 # 行末のコメント",
         "draft: true",
-        "marp: false",
+        "marp: No",
         "theme: default",
         "---",
         "# 本文",
       ].join("\n"),
     );
-    assert.deepEqual(parsed?.data, {
+    assert.ok(typeof parsed === "object", String(parsed));
+    assert.deepEqual(parsed.data, {
       title: '引用符 "付き" # コメントではない',
       summary: "シングル'引用符",
       publishedAt: "2026-10-10T09:00:00+09:00",
@@ -28,24 +30,36 @@ describe("parseFrontmatter", () => {
       marp: false,
       theme: "default",
     });
-    assert.equal(parsed?.body, "# 本文");
+    assert.deepEqual(parsed.blockKeys, []);
+    assert.equal(parsed.body, "# 本文");
   });
 
   test("BOM と CRLF を取り除く", () => {
     const parsed = parseFrontmatter("﻿---\r\ntitle: タイトル\r\n---\r\n本文\r\n");
-    assert.deepEqual(parsed?.data, { title: "タイトル" });
-    assert.equal(parsed?.body, "本文\n");
+    assert.ok(typeof parsed === "object", String(parsed));
+    assert.deepEqual(parsed.data, { title: "タイトル" });
+    assert.equal(parsed.body, "本文\n");
   });
 
-  test("値が空のキー、ブロック、インデントした行は読まない", () => {
-    const parsed = parseFrontmatter(["---", "title:", "summary: |", "  複数行", "style: >", "---", ""].join("\n"));
-    assert.deepEqual(parsed?.data, {});
+  test("ブロックはキーだけを返し、中身の行は読まない", () => {
+    const parsed = parseFrontmatter(["---", "style: |", "  draft: true", "---", ""].join("\n"));
+    assert.ok(typeof parsed === "object", String(parsed));
+    assert.deepEqual(parsed.data, {});
+    assert.deepEqual(parsed.blockKeys, ["style"]);
   });
 
-  test("先頭が --- でない、閉じの --- が無ければ undefined", () => {
-    assert.equal(parseFrontmatter("# 本文だけ"), undefined);
-    assert.equal(parseFrontmatter("\n---\ntitle: a\n---\n"), undefined);
-    assert.equal(parseFrontmatter("---\ntitle: a\n"), undefined);
+  test("読めない行は、行番号と理由をまとめて返す", () => {
+    const parsed = parseFrontmatter(["---", "draft:true", "  draft: true", "title: 2048", "---", ""].join("\n"));
+    assert.equal(typeof parsed, "string");
+    assert.match(String(parsed), /frontmatter の 2 行目: 「key: value」の形で読めません/);
+    assert.match(String(parsed), /frontmatter の 3 行目: インデントした行は読めません/);
+    assert.match(String(parsed), /frontmatter の 4 行目: title の値が数値や日付として読まれます/);
+  });
+
+  test("先頭が --- でない、閉じの --- が無ければ理由を返す", () => {
+    assert.equal(parseFrontmatter("# 本文だけ"), "先頭に --- で囲んだ frontmatter がありません");
+    assert.equal(parseFrontmatter("\n---\ntitle: a\n---\n"), "先頭に --- で囲んだ frontmatter がありません");
+    assert.equal(parseFrontmatter("---\ntitle: a\n"), "frontmatter の閉じの --- がありません");
   });
 });
 
@@ -69,8 +83,12 @@ describe("loadPostDirectory", () => {
       "title: スライド",
       "summary: 概要",
       "publishedAt: 2026-10-01T00:00:00Z",
-      "marp: true",
+      "marp: yes",
+      "# メモ",
       "theme: default",
+      "paginate: on",
+      "style: |",
+      "  section { color: black; }",
       "---",
       "# 1 枚目",
     ]);
@@ -83,8 +101,10 @@ describe("loadPostDirectory", () => {
       "# 概要",
     ]);
     write("no-title.md", ["---", "summary: 概要", "publishedAt: 2026-10-01T00:00:00Z", "---", "本文"]);
-    write("bad-date.md", ["---", "title: t", "summary: s", "publishedAt: 2026-10-01", "---", "本文"]);
+    write("bad-date.md", ["---", "title: t", "summary: s", "publishedAt: 2026-10-01T09:00:00", "---", "本文"]);
+    writeFileSync(path.join(dir, "not-utf8.md"), Buffer.from([0x2d, 0x2d, 0x2d, 0x0a, 0xff, 0x0a]));
     write(".hidden.md", ["---", "title: 隠し", "---", "本文"]);
+    write(".gitkeep", [""]);
     write("readme.txt", ["メモ"]);
   });
 
@@ -109,22 +129,99 @@ describe("loadPostDirectory", () => {
     assert.equal(posts[1].publishedAt, "2026-09-27T15:00:00.000Z");
   });
 
-  test("Marp の記事は title などを除いた frontmatter を本文の先頭に残す", () => {
+  test("Marp の記事は title などを除いた frontmatter を本文の先頭に残し、真偽値は true / false に書き直す", () => {
     const slides = loadPostDirectory(dir, () => {}).find((post) => post.slug === "slides");
-    assert.equal(slides?.bodyMarkdown, "---\nmarp: true\ntheme: default\n---\n# 1 枚目");
+    assert.equal(
+      slides?.bodyMarkdown,
+      [
+        "---",
+        "marp: true",
+        "# メモ",
+        "theme: default",
+        "paginate: true",
+        "style: |",
+        "  section { color: black; }",
+        "---",
+        "# 1 枚目",
+      ].join("\n"),
+    );
   });
 
-  test("必須キーが無い、publishedAt が読めないファイルは理由を警告してスキップする", () => {
+  test("読めないファイルと . で始まる .md は理由を警告してスキップする（.md でない . で始まるファイルは黙って読まない）", () => {
     const warnings: string[] = [];
     loadPostDirectory(dir, (message) => warnings.push(message));
     const dirName = path.basename(dir);
-    assert.equal(warnings.length, 3);
-    assert.ok(warnings[0].includes(`${dirName}/bad-date.md をスキップしました: publishedAt`), warnings[0]);
-    assert.ok(warnings[1].includes(`${dirName}/no-title.md をスキップしました: title がありません`), warnings[1]);
-    assert.ok(warnings[2].includes(`${dirName}/readme.txt を読みません`), warnings[2]);
+    assert.deepEqual(
+      warnings.map((warning) => warning.replace(/^\[markdown-posts\] /, "").split(":")[0]),
+      [
+        `${dirName}/.hidden.md を読みません`,
+        `${dirName}/bad-date.md をスキップしました`,
+        `${dirName}/no-title.md をスキップしました`,
+        `${dirName}/not-utf8.md をスキップしました`,
+        `${dirName}/readme.txt を読みません`,
+      ],
+    );
+    assert.match(warnings[1], /publishedAt をオフセット付きの ISO 8601 として読めません/);
+    assert.match(warnings[2], /title がありません/);
+    assert.match(warnings[3], /UTF-8 として読めません/);
+  });
+
+  test("warn で例外を投げれば、最初の読めないファイルで止まる（ビルドを止めたい呼び出し側のため）", () => {
+    assert.throws(
+      () =>
+        loadPostDirectory(dir, (message) => {
+          throw new Error(message);
+        }),
+      /\.hidden\.md を読みません/,
+    );
   });
 
   test("ディレクトリが無ければ空の配列", () => {
     assert.deepEqual(loadPostDirectory(path.join(dir, "missing"), () => {}), []);
+  });
+});
+
+// markdown-posts.cases.json のケース。API の取り込み側のテストも同じケースを流し、同じ判定になることを確かめる
+interface FixtureCase {
+  name: string;
+  file?: string;
+  lines: string[];
+  expect: "post" | "error" | "ignored";
+  draft?: boolean;
+  title?: string;
+}
+
+describe("markdown-posts.cases.json", () => {
+  const cases = fixture.cases as FixtureCase[];
+  let root: string;
+
+  before(() => {
+    root = mkdtempSync(path.join(tmpdir(), "markdown-posts-cases-"));
+  });
+
+  after(() => rmSync(root, { recursive: true, force: true }));
+
+  test("ケースがある（読み込みの検算）", () => {
+    assert.ok(cases.length > 0);
+  });
+
+  cases.forEach((testCase, index) => {
+    test(testCase.name, () => {
+      const dir = path.join(root, String(index), "blog");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, testCase.file ?? "a.md"), testCase.lines.join("\n"));
+      const warnings: string[] = [];
+      const posts = loadPostDirectory(dir, (message) => warnings.push(message));
+
+      if (testCase.expect === "post") {
+        assert.deepEqual(warnings, []);
+        assert.equal(posts.length, 1);
+        assert.equal(posts[0].draft ?? false, testCase.draft);
+        assert.equal(posts[0].title, testCase.title);
+      } else {
+        assert.equal(warnings.length, testCase.expect === "error" ? 1 : 0, warnings.join("\n"));
+        assert.deepEqual(posts, []);
+      }
+    });
   });
 });
