@@ -1,0 +1,68 @@
+/*
+ * 配色はダークに固定する（ライトモードは持たない）。
+ * 黒地に、アクセント色を 3 つ使う。--yellow が主、--green / --green-2 が従、--red はヘッダーなどの差し色だけ。
+ */
+:root {
+  --background: #0d1210;
+  --background-2: #141b17;
+  --surface: #1a2320;
+  --border: #2a3630;
+  --foreground: #f1f3f2;
+  --muted: #a9b3ad;
+
+  --yellow: #ffe100;
+  --green: #0d9b4e;
+  --green-2: #11c061;
+  --red: #e5002b;
+
+  /* アクセント色を薄く敷くとき（タグの地など） */
+  --yellow-dim: #2a2600;
+  --green-dim: #0f2a1b;
+
+  --focus: var(--yellow);
+  --content-width: 1024px;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Noto Sans JP", system-ui, "Hiragino Sans", sans-serif;
+  line-height: 1.7;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.4;
+}
+
+/* ページの見出しは控えめな大きさにそろえる（記事のタイトルだけ PostDetail で大きくする） */
+h1 {
+  font-size: 1.5rem;
+}
+
+/* キーボード操作のフォーカスは黄のリングで統一する */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}

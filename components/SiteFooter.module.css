@@ -1,0 +1,21 @@
+.footer {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.inner {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.inner a {
+  color: var(--yellow);
+  text-decoration: none;
+}
+
+.inner a:hover {
+  text-decoration: underline;
+}
