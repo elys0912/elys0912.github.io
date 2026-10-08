@@ -105,4 +105,4 @@ main への push（と手動の実行）で `.github/workflows/pages.yml` が `c
 ## ライセンス
 
 - コード：[MIT License](LICENSE)
-- 記事の文章・図・画像：[CC BY-NC 4.0](content/LICENSE.md)。記事の中のコード片は MIT
+- 記事の文章・図・画像：著作権は作者。無断での転載・複製・改変・再配布は不可、引用のみ可（[content/LICENSE.md](content/LICENSE.md)）。記事の中のコード片は MIT
