@@ -22,8 +22,8 @@ SOFTWARE.
 
 ---
 
-This license covers the source code in this repository (app/, components/,
-lib/, scripts/, public/, .github/ and other build and configuration files).
+This license covers the source code in this repository (src/, shared/,
+public/, .github/ and other build and configuration files).
 
 It does NOT cover the articles, images and other works under content/.
 See content/LICENSE.md for their terms.

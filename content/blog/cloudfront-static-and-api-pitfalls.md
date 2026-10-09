@@ -2,9 +2,6 @@
 title: "CloudFront 1 つで静的サイトと API を同居させた時の落とし穴"
 summary: S3 の静的サイトと API Gateway の API を 1 つの CloudFront の下に置いた。errorResponses が /api/* にも効く、OAC に LIST を足して 404 にする、execute-api への直接アクセスを塞ぐ、ロググループがロールバックで消える、の 4 つの落とし穴をスライドにまとめた。
 publishedAt: 2026-09-26T12:30:00+09:00
----
-
----
 marp: true
 theme: default
 paginate: true
