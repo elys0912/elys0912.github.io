@@ -1,13 +1,8 @@
 # dependencies
 /node_modules
 
-# next.js
-/.next/
+# build output
 /out/
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
 
 # misc
 .DS_Store

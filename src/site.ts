@@ -1,5 +1,4 @@
-// サイト全体の設定。URL と文言はここにまとめる（変えるときはこのファイルだけを直す）。
-// node --test から読み込めるよう、このファイルは値と型だけにする（React やパスの解決が要る import を入れない）。
+// サイト全体の設定と、サイト内のパス。URL と文言はここにまとめる（変えるときはこのファイルだけを直す）。
 
 /**
  * サイトの URL（オリジンだけ。末尾の / まで）。canonical、OGP、sitemap.xml、feed.xml の絶対 URL に使う。
@@ -33,7 +32,26 @@ export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
 ];
 
 /**
- * フッターの「前のページへ戻る」の文言。portfolio へ戻る仮の導線（components/FooterBackButton.tsx）。
+ * フッターの「前のページへ戻る」の文言。portfolio へ戻る仮の導線（src/client.js が履歴があるときだけ出す）。
  * TODO: portfolio の独自ドメインができたら、FOOTER_LINKS に portfolio へのリンクを足し、これとボタンを消す
  */
 export const HISTORY_BACK_LABEL = "前のページへ戻る";
+
+/** サイト全体の OGP 画像（public/ に置く静的ファイル）。記事ごとの画像は無い */
+export const OG_IMAGE = { path: "/opengraph-image.png", width: 1200, height: 630, alt: SITE_NAME };
+
+/** 記事一覧（トップページ） */
+export const HOME_PATH = "/";
+
+/** Atom フィード */
+export const FEED_PATH = "/feed.xml";
+
+/** 記事の詳細ページ（/posts/<slug>/） */
+export function postPath(slug: string): string {
+  return `/posts/${encodeURIComponent(slug)}/`;
+}
+
+/** サイト内のパスを絶対 URL にする */
+export function absoluteUrl(path: string): string {
+  return new URL(path, SITE_URL).toString();
+}
