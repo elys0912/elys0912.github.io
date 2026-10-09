@@ -18,7 +18,7 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import type { PostContent } from "./post-types";
+import type { PostContent } from "./post-types.ts";
 
 type FrontmatterValue = string | boolean | string[];
 
