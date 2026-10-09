@@ -12,6 +12,7 @@ import { classOf, type ModuleName } from "./css.ts";
 import {
   absoluteUrl,
   AUTHOR_NAME,
+  CONTENT_SECURITY_POLICY,
   FEED_PATH,
   FOOTER_LINKS,
   HISTORY_BACK_LABEL,
@@ -151,6 +152,7 @@ function headTags({ title, description, path, article, noindex }: HeadOptions, a
   return [
     meta({ charset: "utf-8" }),
     meta({ name: "viewport", content: "width=device-width, initial-scale=1" }),
+    meta({ "http-equiv": "Content-Security-Policy", content: CONTENT_SECURITY_POLICY }),
     link({ rel: "stylesheet", href: assets.css }),
     noindex ? meta({ name: "robots", content: "noindex" }) : "",
     `<title>${escapeHtml(fullTitle)}</title>`,
