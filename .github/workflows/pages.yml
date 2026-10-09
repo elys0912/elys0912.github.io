@@ -24,10 +24,7 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      # main への push で CI（ci.yml）の結果を待たずに動くので、公開しない記事と画像の検査をここでも行う
-      - run: npm run check:drafts
-      - run: npm run check:images
-      # next build を直接呼ぶと後処理（scripts/postbuild.mjs）が走らないので npm run build を使う
+      # main への push で CI（ci.yml）の結果を待たずに動く。公開しない記事（draft、未来の日付）があればビルドが失敗する
       - run: npm run build
       - uses: actions/upload-pages-artifact@v5
         with:
