@@ -3,6 +3,7 @@
 //
 // marp-core の出力は rehype-sanitize を通さない。信頼の根拠は「PR を通したリポジトリの content/ の内容」。
 // その代わり、生の HTML は html: false で全部エスケープし、helper script の埋め込みも止める。
+// 出力の CSS からは `@import` を除き、外部のファイルを読み込ませない（stripLeadingImports）。
 
 import { Marp } from "@marp-team/marp-core";
 
@@ -39,5 +40,40 @@ const marp = new Marp({
 
 export function renderMarp(markdown: string): MarpDeck {
   const { html, css } = marp.render(markdown);
-  return { html, css };
+  return { html, css: stripLeadingImports(css) };
+}
+
+// CSS の `@import` は出力から除く。gaia テーマは先頭で外部のフォント（fonts.bunny.net）を `@import` するが、
+// 外部への通信になり、CSP（style-src と font-src が 'self'）でも止まる。除くとテーマはシステムのフォントで出る。
+// Marpit は @charset と `@import` を CSS の先頭へ寄せて出す（テーマ、<style>、style ディレクティブのどれに書いたものも）。
+// そのため、先頭に並んだ `@import` の文だけを取り除けば足りる。
+const leadingCharset = /^@charset\s*"[^"]*";/;
+const importAtRule = /^@import(?![\w-])/i;
+
+function stripLeadingImports(css: string): string {
+  const charset = leadingCharset.exec(css)?.[0] ?? "";
+  let rest = css.slice(charset.length);
+  for (;;) {
+    const statement = rest.trimStart();
+    if (!importAtRule.test(statement)) break;
+    rest = statement.slice(endOfStatement(statement) + 1);
+  }
+  return charset + rest;
+}
+
+/** 文の終わりの `;` の位置。引用符と括弧の中の `;` は数えない。無ければ末尾（CSS では文の終わりになる） */
+function endOfStatement(css: string): number {
+  let quote: string | undefined;
+  let depth = 0;
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i];
+    if (quote !== undefined) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = undefined;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "(") depth++;
+    else if (c === ")") depth = Math.max(0, depth - 1);
+    else if (c === ";" && depth === 0) return i;
+  }
+  return css.length;
 }
