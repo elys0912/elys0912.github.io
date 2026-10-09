@@ -1,15 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- 3 つのアクセント色の正方形を扇形で描く -->
+  <!-- 時計（12 の目盛り。零時の 12 時だけ長く太く）の中に狐 -->
   <rect width="64" height="64" rx="14" fill="#0d1210"/>
-  <clipPath id="mark">
-    <rect x="8" y="8" width="48" height="48" rx="10"/>
-  </clipPath>
-  <g clip-path="url(#mark)">
-    <!-- 0〜50%（上→右→下）: 黄 -->
-    <rect x="32" y="0" width="32" height="64" fill="#ffe100"/>
-    <!-- 50〜90%（下→左→324°）: 緑 -->
-    <path d="M32 32L32 72A40 40 0 0 1 8.49 -0.36Z" fill="#0d9b4e"/>
-    <!-- 90〜100%（324°→上）: 赤 -->
-    <path d="M32 32L8.49 -0.36A40 40 0 0 1 32 -8Z" fill="#e5002b"/>
-  </g>
+  <circle cx="32" cy="32" r="27" fill="none" stroke="#e5002b" stroke-width="3"/>
+  <line x1="32.00" y1="13.50" x2="32.00" y2="6.50" stroke="#e5002b" stroke-width="3.6"/>
+  <line x1="43.00" y1="12.95" x2="44.75" y2="9.92" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="51.05" y1="21.00" x2="54.08" y2="19.25" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="54.00" y1="32.00" x2="57.50" y2="32.00" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="51.05" y1="43.00" x2="54.08" y2="44.75" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="43.00" y1="51.05" x2="44.75" y2="54.08" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="32.00" y1="54.00" x2="32.00" y2="57.50" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="21.00" y1="51.05" x2="19.25" y2="54.08" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="12.95" y1="43.00" x2="9.92" y2="44.75" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="10.00" y1="32.00" x2="6.50" y2="32.00" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="12.95" y1="21.00" x2="9.92" y2="19.25" stroke="#e5002b" stroke-width="2.2"/>
+  <line x1="21.00" y1="12.95" x2="19.25" y2="9.92" stroke="#e5002b" stroke-width="2.2"/>
+  <path transform="translate(32 33) scale(0.85) translate(-32 -33)" d="M18 17 L27 26 L37 26 L46 17 L45 35 L32 50 L19 35 Z" fill="#e5002b"/>
 </svg>
