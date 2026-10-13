@@ -3,6 +3,7 @@
 //
 // ファイルの形式:
 // - 1 記事 1 ファイル（<slug>.md）。ディレクトリの直下に .md だけを置く。. で始まる .md は読まずにエラーにする
+//   slug は英小文字と数字を - でつないだ形（例: my-post-2）で 200 文字まで。外れたらエラーにする
 //   （.gitkeep のような .md でない . で始まるファイルは対象外で、黙って読まない）
 // - UTF-8 で書く（BOM は取り除く）
 // - 先頭の `---` で囲んだ frontmatter に title、summary、publishedAt（オフセット付きの ISO 8601）を書く。
@@ -17,6 +18,7 @@
 //
 // 同じ入力に対する判定を API の取り込み側の検証とそろえている。そろっていることを確かめるケースは
 // markdown-posts.cases.json にあり、テストがそれを流す。
+// ただし、未来の publishedAt と本文の大きさの上限は、API の取り込み側だけが検査する（ここでは読む）。
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -73,18 +75,21 @@ const MAX_TITLE_LENGTH = 200;
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TECH_ITEMS = 10;
 const MAX_TECH_LENGTH = 40;
-/** 1 記事のタグの個数の上限。ブログの記事一覧の検査でも使うため export する */
-export const MAX_TAGS = 5;
-/** タグ 1 個の長さの上限。作品の tech の 1 個と同じ。ブログの記事一覧の検査でも使うため export する */
-export const MAX_TAG_LENGTH = MAX_TECH_LENGTH;
+/** 1 記事のタグの個数の上限 */
+const MAX_TAGS = 5;
+/** タグ 1 個の長さの上限。作品の tech の 1 個と同じ */
+const MAX_TAG_LENGTH = MAX_TECH_LENGTH;
 /** タグに使えない文字。空白（全角を含む）、, と /。g フラグを付けない（test が lastIndex を持ち越さないため） */
-export const TAG_FORBIDDEN = /[\s,/]/u;
+const TAG_FORBIDDEN = /[\s,/]/u;
 const MAX_REPOSITORY_URL_LENGTH = 500;
 /** repository の形。https で、ホスト名（ドットを含む）の後に、空白を含まない ASCII のパスを置ける（ContentLoader と同じ） */
 const REPOSITORY_URL = /^https:\/\/[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:\/[!-~]*)?$/;
 
 const DELIMITER = "---";
 const MARKDOWN_SUFFIX = ".md";
+/** slug の形と長さの上限。URL の一部になる。API の取り込み側（ContentLoader の SLUG、MAX_SLUG_LENGTH）と同じ */
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const MAX_SLUG_LENGTH = 200;
 
 /** 最上位の `key: value` の行。コロンの後は空白（タブは不可）か行末 */
 const KEY_LINE = /^([A-Za-z_][A-Za-z0-9_-]*):(?: +(.*))?$/;
@@ -274,7 +279,7 @@ export function loadPostDirectory(
       continue;
     }
     const slug = name.slice(0, -MARKDOWN_SUFFIX.length);
-    const result = parsePost(readFileSync(file), slug, options.work === true);
+    const result = validateSlug(slug) ?? parsePost(readFileSync(file), slug, options.work === true);
     if (typeof result === "string") {
       warn(`[markdown-posts] ${label} をスキップしました: ${result}`);
     } else {
@@ -282,6 +287,13 @@ export function loadPostDirectory(
     }
   }
   return posts;
+}
+
+/** slug（ファイル名から .md を除いたもの）を検査する。問題があれば理由の文字列を返す */
+function validateSlug(slug: string): string | undefined {
+  if (!SLUG.test(slug)) return "slug（ファイル名）は英小文字と数字を - でつないだ形にする（例: my-post-2.md）";
+  if (slug.length > MAX_SLUG_LENGTH) return `slug（ファイル名）は ${MAX_SLUG_LENGTH} 文字まで`;
+  return undefined;
 }
 
 /** 1 ファイル分を記事にする。work なら作品として読む（付帯情報を許す）。読めなければ理由の文字列を返す */
