@@ -16,6 +16,7 @@
 //   public/ の中身           favicon.ico、icon.svg、apple-icon.png、opengraph-image.png
 //
 // 書き出した後、ページが読み込むサイト内の画像（<img src>、style の url(…)）が out/ にあるかを確かめる（checkSiteResources）。
+// src/html.ts が引いた class が CSS にあるかも確かめる（checkMissingClasses）。
 
 import { createHash } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -23,7 +24,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 import { groupPostsByMonth } from "./archive.ts";
-import { buildCss } from "./css.ts";
+import { buildCss, missingClassNames } from "./css.ts";
 import { buildAtomFeed, buildRobots, buildSitemap } from "./feed.ts";
 import { archivePage, homePage, notFoundPage, postPage, tagIndexPage, tagPage, type PageContext } from "./html.ts";
 import { imageReferences } from "./images.ts";
@@ -34,6 +35,12 @@ import { groupPostsByTag } from "./tags.ts";
 const root = path.resolve(import.meta.dirname, "..");
 const outDir = path.join(root, "out");
 const contentDir = path.join(root, CONTENT_DIRECTORY);
+
+/**
+ * src/html.ts が引くが、意図して CSS に無い class（"ファイル名.class"）。
+ * PostList.main は portfolio のコンポーネントと同じ構造にするために引くが、共有の CSS に定義が無い
+ */
+const EXPECTED_MISSING_CLASSES: ReadonlySet<string> = new Set(["PostList.main"]);
 
 /** 記事が 0 件でもビルドを通すときに "1" にする環境変数。記事の移動・削除の誤りで、空のサイトを公開しないため */
 const ALLOW_NO_POSTS_ENV = "BLOG_ALLOW_NO_POSTS";
@@ -73,6 +80,7 @@ function main(): void {
 
   const images = copyImages(posts.map((post) => post.slug));
   checkSiteResources();
+  checkMissingClasses();
   console.log(`out/ に記事 ${posts.length} 件のページと、画像 ${images} 枚を書き出しました`);
 }
 
@@ -157,6 +165,20 @@ function checkSiteResources(): void {
       `ページが読み込むファイルが out/ にありません（画像は /${IMAGES_DIRECTORY_NAME}/<slug>/<ファイル名> の形で参照する）:\n${list}`,
     );
   }
+}
+
+/**
+ * src/html.ts が classOf で引いた class のうち、CSS に無く、EXPECTED_MISSING_CLASSES にも無いものがあれば例外を投げる。
+ * CSS に無い class は属性ごと消えるため、portfolio からの同期で共有の CSS の class 名が変わると、見た目だけが黙って崩れる
+ */
+function checkMissingClasses(): void {
+  const unexpected = missingClassNames().filter((name) => !EXPECTED_MISSING_CLASSES.has(name));
+  if (unexpected.length === 0) return;
+
+  const list = unexpected.map((name) => `  - ${name}`).join("\n");
+  throw new Error(
+    `src/html.ts が引く class が CSS にありません（共有の CSS の class 名が変わったなら src/html.ts を合わせる。意図して無いものは src/build.ts の EXPECTED_MISSING_CLASSES に足す）:\n${list}`,
+  );
 }
 
 /** HTML の中の <img src> と、style 属性・<style> の中の url(…)。HTML の文字参照は戻す */

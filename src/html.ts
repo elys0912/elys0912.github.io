@@ -3,6 +3,7 @@
 // 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠、
 // タグのチップのリンク（src/Tags.module.css）。
 // class 名は css.ts が書き換えた名前を classOf で引く。CSS に無い class は、CSS Modules と同じく属性ごと出さない。
+// 意図して CSS に無いもの（build.ts の EXPECTED_MISSING_CLASSES）以外があれば、build.ts がビルドを止める。
 // 文字は escapeHtml を通す。本文の HTML は shared/lib/markdown.ts が許可リストでサニタイズ済み。
 // Marp の HTML は shared/lib/marp.ts が html: false（生の HTML はエスケープ）で変換済み。この 2 つはそのまま埋め込む。
 

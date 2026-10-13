@@ -61,6 +61,9 @@ const UNSUPPORTED = /@keyframes|\bcomposes\s*:|:local\b|:global(?!\()/;
 /** ファイル名ごとの、書き換え前の class 名 → 書き換え後の class 名 */
 const classMap = new Map<string, Map<string, string>>();
 
+/** classOf で引いて CSS に無かった "ファイル名.class"。build.ts が、意図して無いもの以外があればビルドを止めるのに使う */
+const missingClasses = new Set<string>();
+
 /**
  * 結合した CSS を返す。root はリポジトリのルート。
  * 呼んだ後は classOf で class 名を引ける。
@@ -77,13 +80,21 @@ export function buildCss(root: string): string {
 
 /**
  * CSS Modules と同じく、CSS に無い class 名は undefined（Next.js では class 属性が出ない）。
- * buildCss を呼んだ後に使う
+ * 無かったものは missingClassNames で返す。buildCss を呼んだ後に使う
  */
 export function classOf(module: ModuleName, name: string): string | undefined {
   const classes = classMap.get(module);
   if (!classes) throw new Error(`${module}.module.css を読む前に class 名を引いています`);
 
-  return classes.get(name);
+  const scoped = classes.get(name);
+  if (scoped === undefined) missingClasses.add(`${module}.${name}`);
+
+  return scoped;
+}
+
+/** これまでに classOf で引いて CSS に無かった "ファイル名.class"（例 "PostList.main"）の一覧 */
+export function missingClassNames(): string[] {
+  return [...missingClasses].sort();
 }
 
 /** 1 ファイル分の class を prefix_class に書き換え、書き換えた class を classMap に入れる */

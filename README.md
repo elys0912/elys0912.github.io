@@ -98,6 +98,7 @@ npm run preview      # out/ を静的サーバーで開く（npx serve out。ser
 - `shared/` の下に、portfolio の `frontend/` と同じ相対パスで置く（例 `shared/lib/markdown.ts`、`shared/components/PostList.module.css`）
 - 並んでいるファイルは `shared-with-blog.txt`（portfolio の `frontend/` からの相対パス）。同期で上書きされるので、このリポジトリでは直さない。直すときは portfolio 側で直して同期する
 - HTML の構造と class 名は、portfolio の React コンポーネントが出すものに合わせて `src/html.ts` に書いている。portfolio のコンポーネントの構造を変えたら、`src/html.ts` も合わせる
+- `src/html.ts` が引く class が CSS に無いと、`npm run build` が失敗する（CSS Modules と同じく class 属性ごと消え、見た目だけが崩れるため）。同期で共有の CSS の class 名が変わったら `src/html.ts` を合わせる。意図して CSS に無い class（`PostList.main`）は `src/build.ts` の `EXPECTED_MISSING_CLASSES` に並べる
 
 ## デプロイ
 
