@@ -14,9 +14,11 @@
 //   assets/marp-browser.js   marp-core の browser script（Marp の記事だけが読む）
 //   images/<slug>/…          content/images/ のうち、公開した記事から参照されている画像
 //   public/ の中身           favicon.ico、icon.svg、apple-icon.png、opengraph-image.png
+//
+// 書き出した後、ページが読み込むサイト内の画像（<img src>、style の url(…)）が out/ にあるかを確かめる（checkSiteResources）。
 
 import { createHash } from "node:crypto";
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -26,7 +28,7 @@ import { buildAtomFeed, buildRobots, buildSitemap } from "./feed.ts";
 import { archivePage, homePage, notFoundPage, postPage, tagIndexPage, tagPage, type PageContext } from "./html.ts";
 import { imageReferences } from "./images.ts";
 import { CONTENT_DIRECTORY, IMAGES_DIRECTORY_NAME, loadPosts, POSTS_DIRECTORY_NAME } from "./posts.ts";
-import { archivePath, HOME_PATH, postPath, TAG_INDEX_PATH, tagPath } from "./site.ts";
+import { archivePath, HOME_PATH, postPath, SITE_URL, TAG_INDEX_PATH, tagPath } from "./site.ts";
 import { groupPostsByTag } from "./tags.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -70,6 +72,7 @@ function main(): void {
   writeFileSync(path.join(outDir, "robots.txt"), buildRobots());
 
   const images = copyImages(posts.map((post) => post.slug));
+  checkSiteResources();
   console.log(`out/ に記事 ${posts.length} 件のページと、画像 ${images} 枚を書き出しました`);
 }
 
@@ -103,14 +106,15 @@ function marpBrowserScript(): string {
 
 /**
  * content/images/ のうち、公開した記事の本文から参照されている画像だけを out/images/ にコピーする。
- * 参照の拾い方は src/images.ts の imageReferences。参照先のファイルが無いものは警告だけ出す（ビルドは止めない）
+ * 参照の拾い方は src/images.ts の imageReferences。参照先のファイルが無いものがあれば、まとめて例外を投げる
  */
 function copyImages(slugs: readonly string[]): number {
+  const missing: string[] = [];
   let copied = 0;
   for (const key of referencedImages(slugs)) {
     const source = path.join(contentDir, IMAGES_DIRECTORY_NAME, ...key.split("/"));
     if (!existsSync(source)) {
-      console.warn(`記事が参照する画像が content/images/ にありません: ${key}`);
+      missing.push(key);
       continue;
     }
 
@@ -120,7 +124,123 @@ function copyImages(slugs: readonly string[]): number {
     copied++;
   }
 
+  if (missing.length > 0) {
+    const list = missing.map((key) => `  - ${key}`).join("\n");
+    throw new Error(`記事が参照する画像が ${CONTENT_DIRECTORY}/${IMAGES_DIRECTORY_NAME}/ にありません:\n${list}`);
+  }
+
   return copied;
+}
+
+/**
+ * out/ の HTML が読み込むサイト内のファイル（<img src> と、style 属性・<style> の中の url(…)）が out/ にあるかを確かめ、
+ * 無いものがあれば、まとめて例外を投げる。
+ * imageReferences が拾えない書き方（先頭の / が無い、?v= 付き、/images/ の綴り違い、サブディレクトリ）で画像を参照すると、
+ * 画像はコピーされずにページだけが出るため。外部の URL、data:、#… は確かめない
+ */
+function checkSiteResources(): void {
+  const problems: string[] = [];
+  for (const file of htmlFiles(outDir)) {
+    const html = readFileSync(file, "utf8");
+    const pageUrl = new URL(pageUrlPath(file), SITE_URL);
+    for (const src of resourceUrls(html)) {
+      const target = siteFileOf(src, pageUrl);
+      if (target !== undefined && !isFile(target)) {
+        problems.push(`${path.relative(outDir, file).replaceAll(path.sep, "/")}: ${src}`);
+      }
+    }
+  }
+
+  if (problems.length > 0) {
+    const list = [...new Set(problems)].map((problem) => `  - ${problem}`).join("\n");
+    throw new Error(
+      `ページが読み込むファイルが out/ にありません（画像は /${IMAGES_DIRECTORY_NAME}/<slug>/<ファイル名> の形で参照する）:\n${list}`,
+    );
+  }
+}
+
+/** HTML の中の <img src> と、style 属性・<style> の中の url(…)。HTML の文字参照は戻す */
+function resourceUrls(html: string): string[] {
+  const urls: string[] = [];
+  const styles: string[] = [];
+  // 本文の中の < は文字参照になっているため、開始タグとして読むのは本物のタグだけ
+  for (const tag of html.matchAll(/<([a-zA-Z][\w:-]*)((?:\s+[^\s"'>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/g)) {
+    const [, name, attrs] = tag;
+    for (const attr of attrs.matchAll(/\s([^\s"'>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
+      const attrName = attr[1].toLowerCase();
+      const value = decodeHtmlEntities(attr[2] ?? attr[3] ?? attr[4] ?? "");
+      if (name.toLowerCase() === "img" && attrName === "src") urls.push(value);
+      if (attrName === "style") styles.push(value);
+    }
+  }
+  for (const match of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) styles.push(match[1]);
+
+  for (const style of styles) {
+    for (const match of style.matchAll(/\burl\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)) {
+      urls.push(match[1] ?? match[2] ?? match[3]);
+    }
+  }
+
+  return urls.map((url) => url.trim()).filter((url) => url !== "");
+}
+
+/** src がサイト内のファイルを指すなら out/ の中のパス。外部の URL、data:、#… は undefined */
+function siteFileOf(src: string, pageUrl: URL): string | undefined {
+  if (src.startsWith("#") || /^data:/i.test(src)) return undefined;
+
+  let url: URL;
+  try {
+    url = new URL(src, pageUrl);
+  } catch {
+    return undefined;
+  }
+  if (url.origin !== SITE_URL.origin) return undefined;
+
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    // デコードできない %… は配信されるファイルを指さない
+    return INVALID_SITE_FILE;
+  }
+  const segments = pathname.split("/").filter(Boolean);
+  // %5C のように、デコードした後で区切りや上の階層になるものは out/ の外を指しうるので、無いものとして扱う
+  if (segments.some((segment) => segment === "." || segment === ".." || segment.includes("\\"))) return INVALID_SITE_FILE;
+
+  return pathname.endsWith("/") ? path.join(outDir, ...segments, "index.html") : path.join(outDir, ...segments);
+}
+
+/** siteFileOf が返す、out/ の中のファイルとして扱えない src の印（どのファイルにも一致しない） */
+const INVALID_SITE_FILE = "";
+
+/** out/ の中の HTML ファイルのサイト内のパス（out/posts/a/index.html → /posts/a/） */
+function pageUrlPath(file: string): string {
+  const relative = path.relative(outDir, file).split(path.sep).map(encodeURIComponent).join("/");
+
+  return `/${relative.replace(/(^|\/)index\.html$/, "$1")}`;
+}
+
+function htmlFiles(dir: string): string[] {
+  return readdirSync(dir, { recursive: true, encoding: "utf8" })
+    .filter((name) => name.endsWith(".html"))
+    .map((name) => path.join(dir, name));
+}
+
+function isFile(file: string): boolean {
+  return existsSync(file) && statSync(file).isFile();
+}
+
+const HTML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+/** 属性値の文字参照（&quot; &#x26; &#39; など）を戻す */
+function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (entity: string, body: string) => {
+    if (body[0] === "#") {
+      const code = body[1] === "x" || body[1] === "X" ? Number.parseInt(body.slice(2), 16) : Number.parseInt(body.slice(1), 10);
+      return String.fromCodePoint(code);
+    }
+    return HTML_ENTITIES[body.toLowerCase()] ?? entity;
+  });
 }
 
 /** 記事の本文が参照する画像の "<slug>/<ファイル名>"（重複なし） */
