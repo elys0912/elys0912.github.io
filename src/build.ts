@@ -15,8 +15,8 @@
 //   images/<slug>/…          content/images/ のうち、公開した記事から参照されている画像
 //   public/ の中身           favicon.ico、icon.svg、apple-icon.png、opengraph-image.png
 //
-// 書き出した後、ページが読み込むサイト内の画像（<img src>、style の url(…)）が out/ にあるかを確かめる（checkSiteResources）。
-// src/html.ts が引いた class が CSS にあるかも確かめる（checkMissingClasses）。
+// 書き出した後、ページが読み込むサイト内の画像（<img src>、/images/ で始まる href、style の url(…)）が out/ にあるかを確かめる
+// （checkSiteResources）。src/html.ts が引いた class が CSS にあるかも確かめる（checkMissingClasses）。
 
 import { createHash } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -141,10 +141,11 @@ function copyImages(slugs: readonly string[]): number {
 }
 
 /**
- * out/ の HTML が読み込むサイト内のファイル（<img src> と、style 属性・<style> の中の url(…)）が out/ にあるかを確かめ、
- * 無いものがあれば、まとめて例外を投げる。
+ * out/ の HTML が読み込むサイト内のファイル（<img src>、/images/ で始まる href、style 属性・<style> の中の url(…)）が
+ * out/ にあるかを確かめ、無いものがあれば、まとめて例外を投げる。
  * imageReferences が拾えない書き方（先頭の / が無い、?v= 付き、/images/ の綴り違い、サブディレクトリ）で画像を参照すると、
- * 画像はコピーされずにページだけが出るため。外部の URL、data:、#… は確かめない
+ * 画像はコピーされずにページだけが出るため。外部の URL、data:、#… は確かめない。
+ * srcset、<source>、<video poster> は見ない（記事の Markdown からは出ない）
  */
 function checkSiteResources(): void {
   const problems: string[] = [];
@@ -181,7 +182,10 @@ function checkMissingClasses(): void {
   );
 }
 
-/** HTML の中の <img src> と、style 属性・<style> の中の url(…)。HTML の文字参照は戻す */
+/** href のうち、画像へのリンクとして確かめるものの接頭辞（本文の [図](/images/<slug>/x.webp) など） */
+const IMAGE_LINK_PREFIX = `/${IMAGES_DIRECTORY_NAME}/`;
+
+/** HTML の中の <img src>、/images/ で始まる href、style 属性・<style> の中の url(…)。HTML の文字参照は戻す */
 function resourceUrls(html: string): string[] {
   const urls: string[] = [];
   const styles: string[] = [];
@@ -192,6 +196,7 @@ function resourceUrls(html: string): string[] {
       const attrName = attr[1].toLowerCase();
       const value = decodeHtmlEntities(attr[2] ?? attr[3] ?? attr[4] ?? "");
       if (name.toLowerCase() === "img" && attrName === "src") urls.push(value);
+      if (attrName === "href" && value.trim().startsWith(IMAGE_LINK_PREFIX)) urls.push(value);
       if (attrName === "style") styles.push(value);
     }
   }
