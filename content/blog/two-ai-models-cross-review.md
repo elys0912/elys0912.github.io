@@ -2,6 +2,7 @@
 title: "2 つの AI モデルで相互にレビューし、Issue で回す"
 summary: claude-slack-channel のコードを 2 つの AI モデルにレビューさせ、指摘を Epic・Task・調査の 3 階層の Issue に積んで回した。優先度の付け方、調査 Issue で裏を取ってから直す流れ、AI の指摘を鵜呑みにしないための型を書く。
 publishedAt: 2026-10-05T09:00:00+09:00
+tags: [claude-code, claude-slack-channel]
 ---
 
 # はじめに

@@ -2,6 +2,7 @@
 title: "OpenAPI で backend と frontend の型をそろえる"
 summary: Spring Boot の API と Next.js の静的サイトで、手書きの型が API とずれてビルドが止まった。仕様を openapi.json に書き出してコードとのずれをテストで検出し、frontend の型はそこから生成するようにした話。記事が 0 件でも静的 export を通す小技も。
 publishedAt: 2026-09-23T21:00:00+09:00
+tags: [spring-boot, frontend, testing, portfolio]
 ---
 
 # はじめに

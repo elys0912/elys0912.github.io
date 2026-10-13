@@ -2,6 +2,7 @@
 title: "実行許可を Slack のボタンで返す：迷ったら deny に倒す設計"
 summary: Claude Code の実行許可の確認を Slack に中継し、ボタンで答えられるようにした。答えが無いときに allow に倒れる経路を潰す話、ID の検証、見えない文字の可視化、「今後も許可」で作るルールの絞り方を書く。
 publishedAt: 2026-10-02T09:00:00+09:00
+tags: [claude-slack-channel, claude-code, security, design]
 ---
 
 # はじめに

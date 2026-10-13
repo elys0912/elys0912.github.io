@@ -2,6 +2,7 @@
 title: "React の内部から Redux ストアを拾って、Mastodon の Web UI を拡張する"
 summary: Mastodon の投稿欄に公開範囲の切り替えボタンを足すユーザースクリプトを書いた。DOM をクリックで真似るのではなく、React の内部から Redux ストアを取り出し、本家と同じアクションを dispatch する方式にした。状態がずれない代わりに、本家の更新で壊れうるというトレードオフの話。
 publishedAt: 2026-09-14T21:00:00+09:00
+tags: [mastodon, frontend]
 ---
 
 # はじめに

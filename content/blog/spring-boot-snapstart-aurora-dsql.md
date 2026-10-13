@@ -2,6 +2,7 @@
 title: "Spring Boot を Lambda の SnapStart で動かし、Aurora DSQL につなぐ"
 summary: Spring Boot の API を AWS Lambda（Java 21、SnapStart）で動かし、Aurora DSQL に IAM 認証でつないだ。ハンドラと zip の作り方、SnapStart のフック、初回デプロイで踏んだ GRANT と tomcat-embed-el の失敗、DSQL の癖（CREATE INDEX ASYNC、DESC 不可、1 トランザクション 3,000 行）をまとめる。
 publishedAt: 2026-09-24T09:00:00+09:00
+tags: [spring-boot, aws, portfolio]
 ---
 
 # 構成

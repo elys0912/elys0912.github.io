@@ -2,6 +2,7 @@
 title: "hook で状態を知らせ、`!restart` で会話を引き継ぐ"
 summary: Slack からは見えない Claude Code 側の出来事を、hook を通して Slack に知らせる仕組みを作った。別セッションの hook が混ざる、--continue が別の会話を開く、--resume で落ちて戻れなくなるなど、再起動まわりで踏んだ問題と対処を書く。
 publishedAt: 2026-10-05T21:00:00+09:00
+tags: [claude-slack-channel, claude-code]
 ---
 
 # はじめに

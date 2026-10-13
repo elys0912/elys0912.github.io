@@ -2,6 +2,7 @@
 title: "個人開発での Dependabot の運用"
 summary: 個人のリポジトリで Dependabot の PR をどう捌いているか。グループ化と major の除外、週末にまとめて処理する流れ、lockfile の競合の直し方、まとめてマージすると Deploy が取り消される話、Maven wrapper の更新で mvnw.cmd が CRLF で入った話。
 publishedAt: 2026-10-06T21:00:00+09:00
+tags: [ci-cd, portfolio]
 ---
 
 # はじめに

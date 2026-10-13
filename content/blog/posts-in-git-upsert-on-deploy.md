@@ -2,6 +2,7 @@
 title: "記事を Git で管理して、デプロイのたびに DB に upsert する"
 summary: ブログの記事はリポジトリの content/ を正本にして、デプロイのたびにマイグレーション用の Lambda が DB に upsert する。content を API の zip に入れない理由、Lambda Layer 案と S3 アセット案の比較、消した記事を DELETE せず非公開にする理由を書く。
 publishedAt: 2026-10-08T09:00:00+09:00
+tags: [aws, portfolio, design, ci-cd]
 ---
 
 # はじめに

@@ -2,6 +2,7 @@
 title: "小さな OSS のライセンス表記"
 summary: 250 行ほどのユーザースクリプトでも、他人の成果物を含むならライセンス表記は要る。本体の MIT と、アイコンに使った Material Symbols の Apache License 2.0 を、THIRD_PARTY_NOTICES.md と LICENSES/ に分けて明記した話。
 publishedAt: 2026-09-15T21:00:00+09:00
+tags: [mastodon]
 ---
 
 # はじめに
