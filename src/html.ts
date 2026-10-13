@@ -1,5 +1,6 @@
 // ページの HTML。トップ（記事一覧）、記事、404 と、共通の <head>、ヘッダー、フッター。
 // HTML の構造と class 名は portfolio（Next.js の React コンポーネント）が出すものにそろえる。
+// 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠。
 // class 名は css.ts が書き換えた名前を classOf で引く。CSS に無い class は、CSS Modules と同じく属性ごと出さない。
 // 文字は escapeHtml を通す。本文の HTML は shared/lib/markdown.ts が許可リストでサニタイズ済み。
 // Marp の HTML は shared/lib/marp.ts が html: false（生の HTML はエスケープ）で変換済み。この 2 つはそのまま埋め込む。
@@ -23,6 +24,10 @@ import {
   POST_LIST_LEAD,
   POST_LIST_TITLE,
   postPath,
+  PROFILE_BIO,
+  PROFILE_ICON,
+  PROFILE_LINKS,
+  RECENT_POSTS_COUNT,
   SITE_DESCRIPTION,
   SITE_NAME,
 } from "./site.ts";
@@ -52,7 +57,12 @@ export function homePage(posts: readonly PostContent[], ctx: PageContext): strin
       ? `<p${cls("PostList", "empty")}>${escapeHtml(POST_LIST_EMPTY_TEXT)}</p>`
       : `<ul${cls("PostList", "list")}>${posts.map(postCard).join("")}</ul>`;
 
-  return page(ctx, { description: SITE_DESCRIPTION, path: HOME_PATH }, `${heading}${lead}${list}`);
+  return page(ctx, { description: SITE_DESCRIPTION, path: HOME_PATH }, withSidebar(`${heading}${lead}${list}`, posts));
+}
+
+/** 一覧のページの中身を、右にサイドバーを置いた 2 列で包む。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
+function withSidebar(content: string, posts: readonly PostContent[]): string {
+  return `<div${cls("Sidebar", "listLayout")}><div>${content}</div>${sidebar(posts)}</div>`;
 }
 
 /** 記事一覧の 1 件 */
@@ -65,19 +75,21 @@ function postCard(post: PostContent): string {
   return `<li${attr("class", cardClass)}><div${cls("PostList", "main")}>${title}${summary}</div>${date}</li>`;
 }
 
-/** 記事の詳細ページ */
-export function postPage(post: PostContent, ctx: PageContext): string {
+/**
+ * 記事の詳細ページ。右の列は目次（無い記事では出さない）とサイドバー。
+ * posts はサイドバーの部品に使う公開済みの全記事（新しい順）
+ */
+export function postPage(post: PostContent, posts: readonly PostContent[], ctx: PageContext): string {
   const isMarp = isMarpMarkdown(post.bodyMarkdown);
   const { html, headings } = isMarp ? { html: "", headings: [] } : renderMarkdownWithHeadings(post.bodyMarkdown);
   const hasToc = headings.length > 0;
 
   const aside = hasToc ? `<aside${cls("PostDetail", "aside")}>${tableOfContents(headings)}</aside>` : "";
+  const column = `<div${cls("Sidebar", "column")}>${aside}${sidebar(posts)}</div>`;
   const body = isMarp ? marpDeck(post.bodyMarkdown, ctx.assets) : `<div${cls("PostDetail", "body")}>${html}</div>`;
   const backLabel = `${POST_LIST_TITLE}へ戻る`;
   const footer = `<footer${cls("PostDetail", "footer")}><p><a${cls("PostDetail", "back")} href="${HOME_PATH}">← ${escapeHtml(backLabel)}</a></p></footer>`;
-  const withTocClass = hasToc ? (classOf("PostDetail", "withToc") ?? "") : "";
-  const layoutClass = `${classOf("PostDetail", "layout") ?? ""} ${withTocClass}`;
-  const main = `<article${attr("class", layoutClass)}>${postHeader(post)}${aside}<div${cls("PostDetail", "content")}>${body}${footer}</div></article>`;
+  const main = `<article${cls("Sidebar", "postLayout")}>${postHeader(post)}${column}<div${cls("PostDetail", "content")}>${body}${footer}</div></article>`;
 
   const article = { publishedTime: post.publishedAt, updatedTime: post.updatedAt };
 
@@ -122,6 +134,44 @@ function tableOfContents(headings: readonly Heading[]): string {
   const heading = `<p id="toc-heading"${cls("TableOfContents", "heading")}>目次</p>`;
 
   return `<nav${cls("TableOfContents", "toc")} aria-labelledby="toc-heading">${heading}<ol${cls("TableOfContents", "list")}>${items.join("")}</ol></nav>`;
+}
+
+/**
+ * サイドバー。部品を上から順に並べる。部品を足すときは、区画を返す関数を作ってここに並べる。
+ * posts は公開済みの全記事（新しい順）
+ */
+function sidebar(posts: readonly PostContent[]): string {
+  const sections = [profileSection(), recentPostsSection(posts)];
+
+  return `<aside${cls("Sidebar", "sidebar")} aria-label="サイドバー">${sections.join("")}</aside>`;
+}
+
+/** サイドバーの区画（見出しと中身） */
+function sidebarSection(title: string, content: string): string {
+  return `<section${cls("Sidebar", "section")}><h2${cls("Sidebar", "heading")}>${escapeHtml(title)}</h2>${content}</section>`;
+}
+
+/** プロフィール（アイコン、名前、一言、リンク）。アイコンは名前と並べるため alt を空にする */
+function profileSection(): string {
+  const { path, size } = PROFILE_ICON;
+  const icon = `<img${cls("Sidebar", "avatar")} src="${escapeHtml(path)}" alt="" width="${size}" height="${size}"/>`;
+  const name = `<p${cls("Sidebar", "name")}>${escapeHtml(AUTHOR_NAME)}</p>`;
+  const bio = `<p${cls("Sidebar", "bio")}>${escapeHtml(PROFILE_BIO)}</p>`;
+  const links = PROFILE_LINKS.map(
+    (link) => `<a href="${escapeHtml(link.href)}" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`,
+  );
+  const profile = `<div${cls("Sidebar", "profile")}>${icon}<div>${name}${bio}</div></div>`;
+
+  return sidebarSection("プロフィール", `${profile}<p${cls("Sidebar", "links")}>${links.join(" ・ ")}</p>`);
+}
+
+/** 最近の記事（新しい順に RECENT_POSTS_COUNT 件） */
+function recentPostsSection(posts: readonly PostContent[]): string {
+  const items = posts
+    .slice(0, RECENT_POSTS_COUNT)
+    .map((post) => `<li><a href="${escapeHtml(postPath(post.slug))}">${escapeHtml(post.title)}</a></li>`);
+
+  return sidebarSection("最近の記事", `<ul${cls("Sidebar", "recent")}>${items.join("")}</ul>`);
 }
 
 /** Marp のスライド。テーマの CSS は div.marpit の下にスコープされている。文字の自動縮小などは marp-core の browser script が当てる */

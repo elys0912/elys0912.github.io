@@ -44,7 +44,7 @@ function main(): void {
   const ctx: PageContext = { assets, now };
 
   writePage(HOME_PATH, homePage(posts, ctx));
-  for (const post of posts) writePage(postPath(post.slug), postPage(post, ctx));
+  for (const post of posts) writePage(postPath(post.slug), postPage(post, posts, ctx));
   const notFound = notFoundPage(ctx);
   writeFileSync(path.join(outDir, "404.html"), notFound);
   writePage("/404/", notFound);

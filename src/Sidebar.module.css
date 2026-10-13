@@ -1,0 +1,146 @@
+/*
+ * ブログのサイドバー。PC は本文の右に 240px の列を置き、スクロールしても残す（sticky）。
+ * 列が画面より高いときは列の中だけをスクロールさせる。
+ * 900px 以下は 1 列にし、サイドバーを本文の下に回す。
+ */
+
+/* 記事一覧のページ：一覧（左）とサイドバー（右） */
+.listLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  column-gap: 48px;
+  align-items: start;
+}
+
+.listLayout > .sidebar {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+/*
+ * 記事ページ：PostDetail.module.css の .layout.withToc の代わり。右の列（.column）に目次とサイドバーを縦に並べる。
+ * 目次の箱は PostDetail.module.css の .aside（grid-area: aside）
+ */
+.postLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "header column"
+    "content column";
+  column-gap: 48px;
+}
+
+/* grid にしない。目次の箱の grid-area: aside が、この中に暗黙の行と列を作るため */
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  grid-area: column;
+  align-self: start;
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.sidebar {
+  display: grid;
+  gap: 24px;
+  font-size: 0.875rem;
+}
+
+.section {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.heading {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.profile {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.avatar {
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.name {
+  margin: 0 0 4px;
+  font-weight: 700;
+}
+
+.bio {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.links {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+.links a,
+.recent a {
+  color: var(--foreground);
+  text-underline-offset: 0.2em;
+}
+
+.links a:hover,
+.recent a:hover {
+  color: var(--yellow);
+}
+
+.recent {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+  list-style: none;
+}
+
+@media (max-width: 900px) {
+  .listLayout {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 40px;
+  }
+
+  .listLayout > .sidebar {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  /* 目次は見出しと本文のあいだ、サイドバーは本文の下。.column を外し、目次とサイドバーを直接 grid に置く */
+  .postLayout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      "header"
+      "aside"
+      "content"
+      "sidebar";
+  }
+
+  .column {
+    display: contents;
+  }
+
+  .column > .sidebar {
+    grid-area: sidebar;
+    margin-top: 40px;
+  }
+}
