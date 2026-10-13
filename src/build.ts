@@ -11,7 +11,7 @@
 //   feed.xml、sitemap.xml、robots.txt
 //   assets/site.css          shared/ と src/ の CSS を 1 本にしたもの（src/css.ts）
 //   assets/site.js           src/client.js
-//   assets/marp-browser.js   marp-core の browser script（Marp の記事だけが読む）
+//   assets/marp-browser.js   marp-core の browser script（Marp の記事だけが読む。先頭に marp-core の LICENSE を付ける）
 //   images/<slug>/…          content/images/ のうち、公開した記事から参照されている画像
 //   public/ の中身           favicon.ico、icon.svg、apple-icon.png、opengraph-image.png
 //
@@ -120,12 +120,18 @@ function writePage(urlPath: string, html: string): void {
 
 /**
  * marp-core の browser script（読み込むと document の中のスライドに文字の自動縮小などを当てる IIFE）。
- * map は出力しない。そのため source map の参照を外す
+ * map は出力しない。そのため source map の参照を外す。
+ * MIT は複製物に著作権表示とライセンス文を求めるため、先頭に marp-core の LICENSE を付ける。
+ * 同梱されている @marp-team/marpit-svg-polyfill も、著作権者とライセンスが marp-core と同じ
  */
 function marpBrowserScript(): string {
   const require = createRequire(import.meta.url);
   const dir = path.dirname(require.resolve("@marp-team/marp-core/package.json"));
-  return readFileSync(path.join(dir, "lib", "browser-iife.iife.js"), "utf8").replace(/\n\/\/# sourceMappingURL=.*\s*$/, "\n");
+  const { version } = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")) as { version: string };
+  const license = readFileSync(path.join(dir, "LICENSE"), "utf8").trim();
+  const script = readFileSync(path.join(dir, "lib", "browser-iife.iife.js"), "utf8").replace(/\n\/\/# sourceMappingURL=.*\s*$/, "\n");
+
+  return `/*! @marp-team/marp-core ${version} (includes @marp-team/marpit-svg-polyfill)\n\n${license}\n*/\n${script}`;
 }
 
 /**
