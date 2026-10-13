@@ -23,7 +23,6 @@ const MODULE_FILES = {
   layout: "shared/app/layout.module.css",
   SiteHeader: "shared/components/SiteHeader.module.css",
   SiteFooter: "shared/components/SiteFooter.module.css",
-  FooterBackButton: "src/FooterBackButton.module.css",
   PostList: "shared/components/PostList.module.css",
   PostDetail: "shared/components/PostDetail.module.css",
   TableOfContents: "shared/components/TableOfContents.module.css",

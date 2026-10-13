@@ -23,7 +23,6 @@ import {
   CONTENT_SECURITY_POLICY,
   FEED_PATH,
   FOOTER_LINKS,
-  HISTORY_BACK_LABEL,
   HOME_PATH,
   NAV_ITEMS,
   OG_IMAGE,
@@ -392,16 +391,14 @@ function currentNavHref(currentPath: string | undefined): string | undefined {
 
 /**
  * フッター。著作権の表示の年は日本時間で数える。ビルド環境（CI は UTC）の時差の影響を避けるため。
- * 「前のページへ戻る」は履歴があるときだけ src/client.js が足す（data-back-label と data-back-class に文言と class を渡す）
  */
 function siteFooter(now: Date): string {
   const year = formatDate(now.toISOString()).slice(0, 4);
   const links = FOOTER_LINKS.map(
     (link) => `<span> ・ <a href="${escapeHtml(link.href)}" rel="noopener noreferrer">${escapeHtml(link.label)}</a></span>`,
   );
-  const backButton = `${attr("data-back-label", HISTORY_BACK_LABEL)}${attr("data-back-class", classOf("FooterBackButton", "button"))}`;
 
-  return `<footer${cls("SiteFooter", "footer")}><p${cls("SiteFooter", "inner")}${backButton}>© ${year} ${escapeHtml(AUTHOR_NAME)}${links.join("")}</p></footer>`;
+  return `<footer${cls("SiteFooter", "footer")}><p${cls("SiteFooter", "inner")}>© ${year} ${escapeHtml(AUTHOR_NAME)}${links.join("")}</p></footer>`;
 }
 
 /** 複数の class をまとめた class 属性の値（CSS に無い class は外す。1 つも無ければ undefined） */
