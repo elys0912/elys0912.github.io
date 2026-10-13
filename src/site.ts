@@ -77,7 +77,7 @@ export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
 
 /**
  * フッターの「前のページへ戻る」の文言。portfolio へ戻る仮の導線（src/client.js が履歴があるときだけ出す）。
- * TODO: portfolio の独自ドメインができたら、FOOTER_LINKS に portfolio へのリンクを足し、これとボタンを消す
+ * TODO: portfolio の独自ドメインは公開済み（PROFILE_LINKS）。FOOTER_LINKS に portfolio へのリンクを足し、これとボタンを消すかは未決定
  */
 export const HISTORY_BACK_LABEL = "前のページへ戻る";
 
