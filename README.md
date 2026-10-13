@@ -94,9 +94,8 @@ Windows では、`out/` を配信するサーバー（`npm run preview` など�
 - `src/css.ts`：CSS を 1 本（`out/assets/site.css`）にまとめる。CSS Modules の class を「ファイル名_class」（例 `.PostList_title`）に書き換えて結合する
 - `src/feed.ts`：`feed.xml`（Atom 1.0）、`sitemap.xml`、`robots.txt`
 - `src/site.ts`：サイトの URL、サイト名、説明、ナビ、フッターの設定（変えるときはここだけを直す）
-- `src/client.js`：ブラウザで動く小さなスクリプト（目次の現在地、フッターの「前のページへ戻る」）
+- `src/client.js`：ブラウザで動く小さなスクリプト（目次の現在地）
 - `src/*.module.css`：このブログだけの CSS（`src/css.ts` の `MODULE_FILES` に並べる）
-  - `FooterBackButton.module.css`：フッターの「前のページへ戻る」
   - `Sidebar.module.css`：一覧のページと記事ページの 2 列、サイドバー
   - `Tags.module.css`：タグのチップ
 

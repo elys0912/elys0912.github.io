@@ -1,25 +1,10 @@
 // ブラウザで動かすスクリプト（ビルドが out/assets/site.js にコピーし、全ページで読む）。依存なし。
-// 1. フッターの「前のページへ戻る」：履歴があるときだけ出す（直接開いたとき、新しいタブで開いたときは出さない）。
-//    portfolio へ戻る仮の導線。TODO: portfolio の独自ドメインは公開済み（src/site.ts の PROFILE_LINKS）。
-//    src/site.ts の FOOTER_LINKS に portfolio へのリンクを足してこれを消すかは未決定
-// 2. 記事の目次の現在地（aria-current="location"）：スクロールのたびに、画面の上から 30% の線より上にある最後の見出しにする。
-//    ページの末尾まで来たら最後の見出しにする（短い記事では、後ろの見出しが線まで上がらないまま末尾に着くため）。
-//    目次のリンクをクリックしたときは、次に利用者がスクロールするまで、クリックした見出しにする
+// 記事の目次の現在地（aria-current="location"）：スクロールのたびに、画面の上から 30% の線より上にある最後の見出しにする。
+// ページの末尾まで来たら最後の見出しにする（短い記事では、後ろの見出しが線まで上がらないまま末尾に着くため）。
+// 目次のリンクをクリックしたときは、次に利用者がスクロールするまで、クリックした見出しにする
 // @ts-check
 
 (() => {
-  const footer = document.querySelector("p[data-back-label]");
-  if (footer instanceof HTMLElement && window.history.length > 1) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = footer.dataset.backClass ?? "";
-    button.textContent = footer.dataset.backLabel ?? "";
-    button.addEventListener("click", () => window.history.back());
-    const span = document.createElement("span");
-    span.append(" ・ ", button);
-    footer.append(span);
-  }
-
   // 目次の現在地。scroll のたびに見出しの位置から決める。
   // IntersectionObserver（画面の上から 30% の帯に入った見出しにする）は使わない。帯への出入りしか知らせないため。
   // 帯に見出しが無い位置（一度に飛んだ先、上へ戻った先）で前の現在地が残り、短い記事では後ろの見出しが帯に入らない
