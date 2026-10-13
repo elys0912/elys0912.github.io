@@ -18,7 +18,7 @@
 
 import path from "node:path";
 
-import { loadPostDirectory } from "../shared/lib/markdown-posts.ts";
+import { MAX_TAG_LENGTH, TAG_FORBIDDEN, loadPostDirectory } from "../shared/lib/markdown-posts.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
 
 /** リポジトリのルートから見た content/ と、記事と画像を置くディレクトリの名前 */
@@ -31,11 +31,6 @@ const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** 本文（Marp の記事は先頭に残す frontmatter を含む）の UTF-8 のバイト数（128KB） */
 const MAX_BODY_BYTES = 128 * 1024;
-
-/** タグ 1 個の文字数の上限。shared/lib/markdown-posts.ts の MAX_TAG_LENGTH と同じ値（export されていないため写す） */
-const MAX_TAG_LENGTH = 40;
-/** タグに使えない文字。空白（全角を含む）、, と /。shared/lib/markdown-posts.ts の TAG_FORBIDDEN と同じ */
-const TAG_FORBIDDEN = /[\s,/]/u;
 
 /**
  * content/blog/ の記事を読んで検査し、サイトに出す記事を公開日時の新しい順（同時刻なら slug 順）に返す。
