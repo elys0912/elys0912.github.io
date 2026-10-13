@@ -4,7 +4,7 @@ elys0912 のブログ（サイト名は `src/site.ts` の `SITE_NAME` だけに�
 
 - TypeScript のビルドスクリプト（`src/build.ts`）が `content/` の記事を読み、`out/` に静的な HTML を書き出す。GitHub Pages で配信する
 - フレームワークは使わない。Node.js が `.ts` を直接実行する（型の除去）ので、バンドラーやトランスパイラーも無い
-- ページは記事一覧（`/`）と記事（`/posts/<slug>/`）と 404。ほかに Atom フィード（`/feed.xml`）、`sitemap.xml`、`robots.txt` を出力する
+- ページは記事一覧（`/`）、記事（`/posts/<slug>/`）、タグの一覧（`/tags/`）、タグごとの一覧（`/tags/<タグ>/`）、月別の一覧（`/archive/<yyyy>/<mm>/`）と 404。ほかに Atom フィード（`/feed.xml`）、`sitemap.xml`、`robots.txt` を出力する
 
 ## 記事を追加する
 
@@ -29,6 +29,7 @@ publishedAt: 2026-10-10T09:00:00+09:00
 | `title` | 必須 | タイトル |
 | `summary` | 必須 | 概要。一覧、`<meta name="description">`、OGP、フィードに使う |
 | `publishedAt` | 必須 | 公開日時。オフセット付きの ISO 8601（例: `2026-10-10T09:00:00+09:00`）。表示は日本時間の日付 |
+| `tags` | 任意 | タグ。1 行のリストで書く（例: `tags: [aws, TypeScript]`）。5 個まで、1 個 40 文字まで、空白・`,`・`/` は含めない、同じタグは 1 回だけ。タグごとの一覧とサイドバーに出る |
 | `marp` | 任意 | `true` で Marp のスライドの記事にする。`theme` などの Marp の指定も frontmatter に書け、本文の先頭に残してスライドに使う |
 
 - 値は 1 行で書く。` #` の後ろはコメントとして読まないので、`#` を含むタイトルは `"…"` で囲む
@@ -78,18 +79,27 @@ npm run preview      # out/ を静的サーバーで開く（npx serve out。ser
 
 記事を直したら `npm run build` をやり直す（開発サーバーは無い）。ビルドが失敗したときは `out/` を消すので、`npm run preview` は直してビルドが通るまで使えない。
 
+Windows では、`out/` を配信するサーバー（`npm run preview` など）を動かしたまま `npm run build` すると、`out/` を消せずに EPERM で止まる。ビルドの前にサーバーを止める。
+
 ## 構成
 
 - `content/`：記事（`blog/*.md`）と画像（`images/<slug>/`）
 - `public/`：そのまま `out/` にコピーするファイル（`favicon.ico`、`icon.svg`、`apple-icon.png`、`opengraph-image.png`）
 - `src/build.ts`：入口。記事を読み、ページ、フィード、CSS、画像を `out/` に書く
-- `src/posts.ts`：記事の読み込みと検査、画像の参照の拾い方
-- `src/html.ts`：ページの HTML（トップ、記事、404、`<head>`）
+- `src/posts.ts`：記事の読み込みと検査
+- `src/images.ts`：記事の本文が参照する画像の拾い方
+- `src/tags.ts`、`src/archive.ts`：タグごと、月ごとの記事のまとめ
+- `src/html.ts`：ページの HTML（トップ、記事、タグ、月別、404、`<head>`、サイドバー）
 - `src/css.ts`：CSS を 1 本（`out/assets/site.css`）にまとめる。CSS Modules の class を「ファイル名_class」（例 `.PostList_title`）に書き換えて結合する
 - `src/feed.ts`：`feed.xml`（Atom 1.0）、`sitemap.xml`、`robots.txt`
 - `src/site.ts`：サイトの URL、サイト名、説明、ナビ、フッターの設定（変えるときはここだけを直す）
 - `src/client.js`：ブラウザで動く小さなスクリプト（目次の現在地、フッターの「前のページへ戻る」）
-- `src/FooterBackButton.module.css`：このブログだけの CSS
+- `src/*.module.css`：このブログだけの CSS（`src/css.ts` の `MODULE_FILES` に並べる）
+  - `FooterBackButton.module.css`：フッターの「前のページへ戻る」
+  - `Sidebar.module.css`：一覧のページと記事ページの 2 列、サイドバー
+  - `Tags.module.css`：タグのチップ
+
+記事ページの 2 列は、共有の PostDetail の 2 列（`.layout.withToc`）を使わず、`Sidebar.module.css` の `.postLayout`（出力の class は `Sidebar_postLayout`）で組んでいる。右の列にサイドバーと目次を縦に並べるため。共有側の 2 列の作り（領域の並び、列の間隔、900px 以下の並び）を変えてもブログには反映されないので、変えたら `Sidebar.module.css` を手で合わせる。
 
 ### portfolio との共有（`shared/`）
 
