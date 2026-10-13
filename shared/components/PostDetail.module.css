@@ -1,5 +1,5 @@
 /*
- * PC は本文（左）と目次（右、220px、sticky）の 2 列。目次は本文の高さいっぱいの列に置き、
+ * PC は本文（左）と目次（右、240px、sticky。ブログの記事ページの右の列とそろえる）の 2 列。目次は本文の高さいっぱいの列に置き、
  * 900px 以下では 1 列にして、目次を見出しと本文のあいだに入れる。
  */
 .layout {
@@ -11,7 +11,7 @@
 }
 
 .layout.withToc {
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 240px;
   grid-template-rows: auto 1fr;
   grid-template-areas:
     "header aside"
