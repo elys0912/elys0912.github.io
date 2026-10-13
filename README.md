@@ -51,6 +51,8 @@ publishedAt: 2026-10-10T09:00:00+09:00
 - 読めない記事（frontmatter の誤り、`draft:true` や `Draft: true` のような読めない書き方、`.` で始まる `.md`、`.md` でないファイル、slug の形）
 - 本文が 128KB を超える記事
 
+公開する記事が 1 件も無い（`content/blog/` が空・無い）ときも失敗する。記事の移動・削除の誤りで空のサイトを公開しないため。意図して 0 件にするときだけ `BLOG_ALLOW_NO_POSTS=1 npm run build` で実行する。
+
 ## 画像
 
 ```

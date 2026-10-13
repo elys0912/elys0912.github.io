@@ -33,9 +33,17 @@ const root = path.resolve(import.meta.dirname, "..");
 const outDir = path.join(root, "out");
 const contentDir = path.join(root, CONTENT_DIRECTORY);
 
+/** 記事が 0 件でもビルドを通すときに "1" にする環境変数。記事の移動・削除の誤りで、空のサイトを公開しないため */
+const ALLOW_NO_POSTS_ENV = "BLOG_ALLOW_NO_POSTS";
+
 function main(): void {
   const now = new Date();
   const posts = loadPosts(contentDir, now);
+  if (posts.length === 0 && process.env[ALLOW_NO_POSTS_ENV] !== "1") {
+    throw new Error(
+      `${CONTENT_DIRECTORY}/${POSTS_DIRECTORY_NAME}/ に公開する記事が 1 件もありません。意図して 0 件にするときは ${ALLOW_NO_POSTS_ENV}=1 を付けて実行する`,
+    );
+  }
 
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
