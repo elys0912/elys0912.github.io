@@ -23,6 +23,21 @@ export const POST_LIST_EMPTY_TEXT = "なんもない";
 /** ヘッダーのナビの項目。href は末尾を / にしたサイト内のパス */
 export const NAV_ITEMS: readonly { href: string; label: string }[] = [{ href: "/", label: POST_LIST_TITLE }];
 
+/** サイドバーのプロフィールの一言（仮。サイトの説明と同じ文） */
+export const PROFILE_BIO = SITE_DESCRIPTION;
+
+/** サイドバーのプロフィールのアイコン（public/ に置く静的ファイル。180x180 を縮めて出す） */
+export const PROFILE_ICON = { path: "/apple-icon.png", size: 56 };
+
+/** サイドバーのプロフィールの下に並べるリンク */
+export const PROFILE_LINKS: readonly { href: string; label: string }[] = [
+  { href: "https://github.com/elys0912", label: "GitHub" },
+  { href: "https://elysdev.net/", label: "ポートフォリオ" },
+];
+
+/** サイドバーの「最近の記事」に出す件数 */
+export const RECENT_POSTS_COUNT = 5;
+
 /** フッターの著作権の表示の後ろに置くリンク（仮）。記事のライセンスを案内する */
 export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
   {
