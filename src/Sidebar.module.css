@@ -94,6 +94,7 @@
 
 .links a,
 .recent a,
+.tags a,
 .months a {
   color: var(--foreground);
   text-underline-offset: 0.2em;
@@ -101,11 +102,13 @@
 
 .links a:hover,
 .recent a:hover,
+.tags a:hover,
 .months a:hover {
   color: var(--yellow);
 }
 
 .recent,
+.tags,
 .months {
   display: grid;
   gap: 8px;
@@ -115,7 +118,8 @@
   list-style: none;
 }
 
-/* 月別の件数。「2026-10 (4)」の (4) */
+/* タグと月別の件数。「aws (5)」「2026-10 (4)」の (5)、(4) */
+.tagCount,
 .monthCount {
   color: var(--muted);
 }
