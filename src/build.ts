@@ -4,6 +4,7 @@
 // out/
 //   index.html               記事一覧
 //   posts/<slug>/index.html  記事
+//   archive/<yyyy>/<mm>/index.html  月別の記事一覧（記事のある月だけ）
 //   404.html、404/index.html ページが見つからないとき（GitHub Pages は 404.html を返す）
 //   feed.xml、sitemap.xml、robots.txt
 //   assets/site.css          shared/ と src/ の CSS を 1 本にしたもの（src/css.ts）
@@ -17,12 +18,13 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writ
 import { createRequire } from "node:module";
 import path from "node:path";
 
+import { groupPostsByMonth } from "./archive.ts";
 import { buildCss } from "./css.ts";
 import { buildAtomFeed, buildRobots, buildSitemap } from "./feed.ts";
-import { homePage, notFoundPage, postPage, type PageContext } from "./html.ts";
+import { archivePage, homePage, notFoundPage, postPage, type PageContext } from "./html.ts";
 import { imageReferences } from "./images.ts";
 import { CONTENT_DIRECTORY, IMAGES_DIRECTORY_NAME, loadPosts, POSTS_DIRECTORY_NAME } from "./posts.ts";
-import { HOME_PATH, postPath } from "./site.ts";
+import { archivePath, HOME_PATH, postPath } from "./site.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const outDir = path.join(root, "out");
@@ -45,6 +47,7 @@ function main(): void {
 
   writePage(HOME_PATH, homePage(posts, ctx));
   for (const post of posts) writePage(postPath(post.slug), postPage(post, posts, ctx));
+  for (const archive of groupPostsByMonth(posts)) writePage(archivePath(archive.month), archivePage(archive, posts, ctx));
   const notFound = notFoundPage(ctx);
   writeFileSync(path.join(outDir, "404.html"), notFound);
   writePage("/404/", notFound);

@@ -38,6 +38,15 @@ export const PROFILE_LINKS: readonly { href: string; label: string }[] = [
 /** サイドバーの「最近の記事」に出す件数 */
 export const RECENT_POSTS_COUNT = 5;
 
+/** 月別の一覧ページの見出し（<title> にも使う）と説明。month は「2026-10」（yyyy-MM） */
+export function archiveTitle(month: string): string {
+  return `${month} の記事`;
+}
+
+export function archiveDescription(month: string): string {
+  return `${month} に公開した記事の一覧`;
+}
+
 /** フッターの著作権の表示の後ろに置くリンク（仮）。記事のライセンスを案内する */
 export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
   {
@@ -84,6 +93,13 @@ export const FEED_PATH = "/feed.xml";
 /** 記事の詳細ページ（/posts/<slug>/） */
 export function postPath(slug: string): string {
   return `/posts/${encodeURIComponent(slug)}/`;
+}
+
+/** 月別の一覧ページ（/archive/<yyyy>/<mm>/）。month は「2026-10」（yyyy-MM） */
+export function archivePath(month: string): string {
+  const [year, monthNumber] = month.split("-");
+
+  return `/archive/${year}/${monthNumber}/`;
 }
 
 /** サイト内のパスを絶対 URL にする */

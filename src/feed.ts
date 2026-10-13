@@ -2,8 +2,10 @@
 // 依存を増やさないよう XML は文字列で組み立てる。値はすべて escapeXml を通す。
 
 import type { PostContent } from "../shared/lib/post-types.ts";
+import { groupPostsByMonth } from "./archive.ts";
 import {
   absoluteUrl,
+  archivePath,
   AUTHOR_NAME,
   FEED_PATH,
   HOME_PATH,
@@ -70,11 +72,18 @@ function toRfc3339(value: string): string {
   return new Date(value).toISOString();
 }
 
-/** sitemap.xml。トップページ（記事があれば最新の更新日時を付ける）と、記事のページ */
+/**
+ * sitemap.xml。トップページ（記事があれば最新の更新日時を付ける）、記事のページ、月別の一覧ページ。
+ * 月別の一覧ページの lastmod は、その月の記事の最新の更新日時
+ */
 export function buildSitemap(posts: readonly PostContent[]): string {
   const entries = posts.map((post) => ({ url: absoluteUrl(postPath(post.slug)), lastModified: post.updatedAt }));
   const home = { url: absoluteUrl(HOME_PATH), lastModified: latest(entries.map((entry) => entry.lastModified)) };
-  const urls = [home, ...entries].map(({ url, lastModified }) => {
+  const archives = groupPostsByMonth(posts).map((archive) => ({
+    url: absoluteUrl(archivePath(archive.month)),
+    lastModified: latest(archive.posts.map((post) => post.updatedAt)),
+  }));
+  const urls = [home, ...entries, ...archives].map(({ url, lastModified }) => {
     const lastmod = lastModified === undefined ? [] : [element("lastmod", lastModified)];
 
     return ["<url>", element("loc", url), ...lastmod, "</url>"].join("\n");
