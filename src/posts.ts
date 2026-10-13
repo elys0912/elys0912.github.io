@@ -8,6 +8,10 @@
 // - 本文が MAX_BODY_BYTES を超える
 // - draft: true の記事（下書きはこのリポジトリの外で書く）
 // - publishedAt が未来の記事（予約公開はしない）
+// - NFC に正規化すると同じになるタグが、1 つの記事に 2 回以上ある
+//
+// タグは読んだ直後に NFC に正規化する。見た目が同じで文字コードが違うタグ（NFC と NFD）を、同じタグとして数えるため。
+// src/tags.ts の検査と、タグの一覧・URL・ディレクトリ名は、正規化した後の値を使う。
 //
 // 画像の参照の拾い方は src/images.ts。
 
@@ -33,7 +37,9 @@ const MAX_BODY_BYTES = 128 * 1024;
  */
 export function loadPosts(contentDir: string, now: Date): PostContent[] {
   const problems: string[] = [];
-  const posts = loadPostDirectory(path.join(contentDir, POSTS_DIRECTORY_NAME), (message) => problems.push(message));
+  const posts = loadPostDirectory(path.join(contentDir, POSTS_DIRECTORY_NAME), (message) => problems.push(message)).map(
+    normalizeTags,
+  );
   for (const post of posts) problems.push(...postProblems(post, now));
 
   if (problems.length > 0) {
@@ -42,6 +48,13 @@ export function loadPosts(contentDir: string, now: Date): PostContent[] {
   }
 
   return posts.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || a.slug.localeCompare(b.slug));
+}
+
+/** タグを NFC に正規化した記事を返す。タグの並びは変えない */
+function normalizeTags(post: PostContent): PostContent {
+  if (post.tags === undefined) return post;
+
+  return { ...post, tags: post.tags.map((tag) => tag.normalize("NFC")) };
 }
 
 /** 1 記事分の、ブログの規則に合わない点 */
@@ -55,6 +68,10 @@ function postProblems(post: PostContent, now: Date): string[] {
   const bytes = new TextEncoder().encode(post.bodyMarkdown).length;
   if (bytes > MAX_BODY_BYTES) {
     problems.push(`${label}: 本文が ${bytes} バイトあります。${MAX_BODY_BYTES} バイト（128KB）までにする（記事を分ける）`);
+  }
+  // 読み込みの検査（shared/lib/markdown-posts.ts）は正規化の前の値で比べるため、正規化の後にもう一度比べる
+  if (post.tags !== undefined && new Set(post.tags).size !== post.tags.length) {
+    problems.push(`${label}: tags に同じタグが 2 回以上あります（NFC に正規化して比べた結果）`);
   }
   if (post.draft) {
     problems.push(`${label}: draft: true の記事は置かない（公開できる状態になってから draft の行を消して置く）`);
