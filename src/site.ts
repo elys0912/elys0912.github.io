@@ -26,8 +26,8 @@ export const NAV_ITEMS: readonly { href: string; label: string }[] = [
   { href: "/tags/", label: "タグ" },
 ];
 
-/** サイドバーのプロフィールの一言（仮。サイトの説明と同じ文） */
-export const PROFILE_BIO = SITE_DESCRIPTION;
+/** サイドバーのプロフィールの一言 */
+export const PROFILE_BIO = "自称エンジニア　好きなものはゲームとお酒とタバコ、あとサッカー";
 
 /** サイドバーのプロフィールのアイコン（public/ に置く静的ファイル。180x180 を縮めて出す） */
 export const PROFILE_ICON = { path: "/apple-icon.png", size: 56 };
