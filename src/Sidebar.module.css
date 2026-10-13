@@ -1,10 +1,8 @@
 /*
  * ブログのサイドバー。PC は本文の右に 240px の列を置く。
- * 右の列は sticky にせず、ページと一緒にスクロールさせる。サイドバーだけで 1000px ほどあり、
- * 1280×800 の画面でも列が画面より高くなる。sticky のままでは列の下側が画面の外に残るため、
- * 列の中をスクロールさせる必要が出る。列の中のスクロールバーは使わない。
- * 目次だけを sticky にする案は採らない。目次の後ろにサイドバーを置くと、目次の高さの箱の中でしか動かず効かない。
- * 目次の箱を本文の高さまで伸ばすと、サイドバーが本文の末尾まで下がる。
+ * サイドバーは sticky にせず、ページと一緒にスクロールさせる。サイドバーだけで 1000px ほどあり、
+ * 1280×800 の画面でも画面より高くなる。sticky にすると下側が画面の外に残り、列の中のスクロールが要るため。
+ * 記事ページの右の列は、サイドバー、目次の順に並べ、目次だけを sticky にする（.column の説明）。
  * 900px 以下は 1 列にし、サイドバーを本文の下に回す。
  */
 
@@ -17,7 +15,7 @@
 }
 
 /*
- * 記事ページ：PostDetail.module.css の .layout.withToc の代わり。右の列（.column）に目次とサイドバーを縦に並べる。
+ * 記事ページ：PostDetail.module.css の .layout.withToc の代わり。右の列（.column）にサイドバーと目次を縦に並べる。
  * 目次の箱は PostDetail.module.css の .aside（grid-area: aside）
  */
 .postLayout {
@@ -30,13 +28,27 @@
   column-gap: 48px;
 }
 
-/* grid にしない。目次の箱の grid-area: aside が、この中に暗黙の行と列を作るため */
+/*
+ * grid にしない。目次の箱の grid-area: aside が、この中に暗黙の行と列を作るため。
+ * 列は記事の高さまで伸ばす（align-self の既定の stretch）。目次の箱（サイドバーでない子）は列の残りの高さいっぱいに伸ばす。
+ * 目次は PostDetail.module.css の .aside > * で sticky（top: 24px）になり、この箱の中を動く。
+ * 目次の後ろにサイドバーを置くと、目次の箱が目次と同じ高さになり sticky が効かないため、サイドバーを先に置く
+ */
 .column {
   display: flex;
   flex-direction: column;
   gap: 32px;
   grid-area: column;
-  align-self: start;
+}
+
+.column > :not(.sidebar) {
+  flex-grow: 1;
+}
+
+/* 目次が画面より高いときは、目次の中だけをスクロールさせる */
+.column > :not(.sidebar) > * {
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 
 .sidebar {
@@ -136,6 +148,11 @@
 
   .column {
     display: contents;
+  }
+
+  .column > :not(.sidebar) > * {
+    max-height: none;
+    overflow-y: visible;
   }
 
   .column > .sidebar {

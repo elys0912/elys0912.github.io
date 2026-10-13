@@ -152,7 +152,7 @@ function tagChips(tags: readonly string[] | undefined): string {
 }
 
 /**
- * 記事の詳細ページ。右の列は目次（無い記事では出さない）とサイドバー。
+ * 記事の詳細ページ。右の列はサイドバーと、その下の目次（無い記事では出さない）。
  * posts はサイドバーの部品に使う公開済みの全記事（新しい順）
  */
 export function postPage(post: PostContent, posts: readonly PostContent[], ctx: PageContext): string {
@@ -161,7 +161,7 @@ export function postPage(post: PostContent, posts: readonly PostContent[], ctx: 
   const hasToc = headings.length > 0;
 
   const aside = hasToc ? `<aside${cls("PostDetail", "aside")}>${tableOfContents(headings)}</aside>` : "";
-  const column = `<div${cls("Sidebar", "column")}>${aside}${sidebar(posts)}</div>`;
+  const column = `<div${cls("Sidebar", "column")}>${sidebar(posts)}${aside}</div>`;
   const body = isMarp ? marpDeck(post.bodyMarkdown, ctx.assets) : `<div${cls("PostDetail", "body")}>${html}</div>`;
   const backLabel = `${POST_LIST_TITLE}へ戻る`;
   const footer = `<footer${cls("PostDetail", "footer")}><p><a${cls("PostDetail", "back")} href="${HOME_PATH}">← ${escapeHtml(backLabel)}</a></p></footer>`;
