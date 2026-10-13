@@ -5,6 +5,7 @@ publishedAt: 2026-09-26T12:30:00+09:00
 marp: true
 theme: default
 paginate: true
+tags: [aws, portfolio, security]
 ---
 
 # CloudFront 1 つで静的サイトと API を同居させた時の落とし穴

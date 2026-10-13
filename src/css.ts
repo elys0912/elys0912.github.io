@@ -29,6 +29,7 @@ const MODULE_FILES = {
   TableOfContents: "shared/components/TableOfContents.module.css",
   MarpDeck: "shared/components/MarpDeck.module.css",
   Sidebar: "src/Sidebar.module.css",
+  Tags: "src/Tags.module.css",
 } as const;
 
 export type ModuleName = keyof typeof MODULE_FILES;
