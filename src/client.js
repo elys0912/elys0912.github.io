@@ -2,7 +2,8 @@
 // 1. フッターの「前のページへ戻る」：履歴があるときだけ出す（直接開いたとき、新しいタブで開いたときは出さない）。
 //    portfolio へ戻る仮の導線。TODO: portfolio の独自ドメインができたら、src/site.ts の FOOTER_LINKS にリンクを足してこれを消す
 // 2. 記事の目次の現在地（aria-current="location"）：スクロールのたびに、画面の上から 30% の線より上にある最後の見出しにする。
-//    ページの末尾まで来たら最後の見出しにする（短い記事では、後ろの見出しが線まで上がらないまま末尾に着くため）
+//    ページの末尾まで来たら最後の見出しにする（短い記事では、後ろの見出しが線まで上がらないまま末尾に着くため）。
+//    目次のリンクをクリックしたときは、次に利用者がスクロールするまで、クリックした見出しにする
 // @ts-check
 
 (() => {
@@ -30,14 +31,26 @@
 
   // 見出しがこの線（画面の上から 30%）より上に来たら、その見出しの節を読んでいるとみなす
   const CURRENT_LINE_RATIO = 0.3;
-  const markCurrentSection = () => {
+  const sectionAtScrollPosition = () => {
     const currentLineY = window.innerHeight * CURRENT_LINE_RATIO;
     // scrollY が小数になる拡大率でも末尾と判定するため、切り上げて比べる
     const isScrolledToBottom =
       window.scrollY > 0 && Math.ceil(window.scrollY + window.innerHeight) >= document.documentElement.scrollHeight;
     const passedSections = sections.filter(({ heading }) => heading.getBoundingClientRect().top <= currentLineY);
-    const current = isScrolledToBottom ? sections[sections.length - 1] : (passedSections.at(-1) ?? sections[0]);
 
+    return isScrolledToBottom ? sections[sections.length - 1] : (passedSections.at(-1) ?? sections[0]);
+  };
+
+  // 目次のリンクで移った節。末尾近くの見出しは線まで上がらず、末尾では最後の見出しになるため、クリックした節を優先する。
+  // 次に利用者がスクロールしたら undefined に戻し、スクロール位置からの判定に戻す
+  /** @type {(typeof sections)[number] | undefined} */
+  let clickedSection;
+  // 目次のクリックの後に、利用者がスクロールの操作（ホイール、タッチ、キー、スクロールバーのドラッグ）をしたか。
+  // リンクで移るときのスクロール（smooth scroll を含む）は scroll を何度も起こすため、scroll だけでは利用者の操作と区別できない
+  let hasUserScrollInput = false;
+
+  const markCurrentSection = () => {
+    const current = clickedSection ?? sectionAtScrollPosition();
     for (const { link } of sections) {
       if (link === current.link) link.setAttribute("aria-current", "location");
       else link.removeAttribute("aria-current");
@@ -55,7 +68,41 @@
       markCurrentSection();
     });
   };
-  window.addEventListener("scroll", scheduleMarkCurrentSection, { passive: true });
+
+  for (const section of sections) {
+    section.link.addEventListener("click", (event) => {
+      if (!(event instanceof MouseEvent)) return;
+
+      // 修飾キー付きと左以外のボタンは新しいタブなどで開き、このページの中を移らない
+      const isNewTabClick = event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey;
+      if (event.defaultPrevented || isNewTabClick) return;
+
+      clickedSection = section;
+      // クリックの前の pointerdown・keydown（Enter）はスクロールの操作として数えない
+      hasUserScrollInput = false;
+      markCurrentSection();
+    });
+  }
+
+  // scroll より先に来る、利用者の操作。pointerdown はスクロールバーのドラッグとクリックを含む
+  for (const type of ["wheel", "touchstart", "keydown", "pointerdown"]) {
+    window.addEventListener(
+      type,
+      () => {
+        hasUserScrollInput = true;
+      },
+      { passive: true, capture: true },
+    );
+  }
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (hasUserScrollInput) clickedSection = undefined;
+      scheduleMarkCurrentSection();
+    },
+    { passive: true },
+  );
   window.addEventListener("resize", scheduleMarkCurrentSection);
   markCurrentSection();
 })();
