@@ -17,12 +17,14 @@
 //
 // 書き出した後、ページが読み込むサイト内の画像（<img src>、/images/ で始まる href、style の url(…)）が out/ にあるかを確かめる
 // （checkSiteResources）。src/html.ts が引いた class が CSS にあるかも確かめる（checkMissingClasses）。
+// 書き出しや確かめるところで失敗したときは、書きかけの out/ を配信しないよう消す。
 
 import { createHash } from "node:crypto";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
+import type { PostContent } from "../shared/lib/post-types.ts";
 import { groupPostsByMonth } from "./archive.ts";
 import { buildCss, missingClassNames } from "./css.ts";
 import { buildAtomFeed, buildRobots, buildSitemap } from "./feed.ts";
@@ -55,6 +57,19 @@ function main(): void {
   }
 
   rmSync(outDir, { recursive: true, force: true });
+  let images: number;
+  try {
+    images = writeSite(posts, now);
+  } catch (error) {
+    // 書きかけの out/ を npm run preview などで配信しないよう消す
+    rmSync(outDir, { recursive: true, force: true });
+    throw error;
+  }
+  console.log(`out/ に記事 ${posts.length} 件のページと、画像 ${images} 枚を書き出しました`);
+}
+
+/** out/ にサイトを書き出し、確かめる。コピーした画像の枚数を返す */
+function writeSite(posts: readonly PostContent[], now: Date): number {
   mkdirSync(outDir, { recursive: true });
   cpSync(path.join(root, "public"), outDir, { recursive: true });
 
@@ -81,7 +96,8 @@ function main(): void {
   const images = copyImages(posts.map((post) => post.slug));
   checkSiteResources();
   checkMissingClasses();
-  console.log(`out/ に記事 ${posts.length} 件のページと、画像 ${images} 枚を書き出しました`);
+
+  return images;
 }
 
 /** out/assets/<name> に書き、中身のハッシュを ?v= に付けた URL を返す。ハッシュは更新時にブラウザのキャッシュを使わないため */

@@ -76,7 +76,7 @@ npm run build        # out/ に書き出す（node src/build.ts）
 npm run preview      # out/ を静的サーバーで開く（npx serve out。serve は依存に入れていない）
 ```
 
-記事を直したら `npm run build` をやり直す（開発サーバーは無い）。
+記事を直したら `npm run build` をやり直す（開発サーバーは無い）。ビルドが失敗したときは `out/` を消すので、`npm run preview` は直してビルドが通るまで使えない。
 
 ## 構成
 
