@@ -1,6 +1,10 @@
 /*
- * ブログのサイドバー。PC は本文の右に 240px の列を置き、スクロールしても残す（sticky）。
- * 列が画面より高いときは列の中だけをスクロールさせる。
+ * ブログのサイドバー。PC は本文の右に 240px の列を置く。
+ * 右の列は sticky にせず、ページと一緒にスクロールさせる。サイドバーだけで 1000px ほどあり、
+ * 1280×800 の画面でも列が画面より高くなる。sticky のままでは列の下側が画面の外に残るため、
+ * 列の中をスクロールさせる必要が出る。列の中のスクロールバーは使わない。
+ * 目次だけを sticky にする案は採らない。目次の後ろにサイドバーを置くと、目次の高さの箱の中でしか動かず効かない。
+ * 目次の箱を本文の高さまで伸ばすと、サイドバーが本文の末尾まで下がる。
  * 900px 以下は 1 列にし、サイドバーを本文の下に回す。
  */
 
@@ -10,13 +14,6 @@
   grid-template-columns: minmax(0, 1fr) 240px;
   column-gap: 48px;
   align-items: start;
-}
-
-.listLayout > .sidebar {
-  position: sticky;
-  top: 24px;
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
 }
 
 /*
@@ -40,10 +37,6 @@
   gap: 32px;
   grid-area: column;
   align-self: start;
-  position: sticky;
-  top: 24px;
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
 }
 
 .sidebar {
@@ -128,12 +121,6 @@
   .listLayout {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 40px;
-  }
-
-  .listLayout > .sidebar {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
   }
 
   /* 目次は見出しと本文のあいだ、サイドバーは本文の下。.column を外し、目次とサイドバーを直接 grid に置く */
