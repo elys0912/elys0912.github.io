@@ -9,6 +9,8 @@
 //   draft: true は下書き。marp: true はスライドの記事で、Marp の指定（theme など）はこのときだけ書ける
 // - 作品として読むとき（loadPostDirectory の options.work）だけ、作品の付帯情報 badge、tech、repository を書ける。
 //   ブログ（options を渡さない）では、ほかの知らないキーと同じくエラーにする
+// - ブログ（作品として読まないとき）だけ、記事のタグ tags を書ける。作品では、ほかの知らないキーと同じくエラーにする
+//   （API の取り込み側は作品しか読まず、tags を読まないため）
 // - frontmatter は YAML のうち、parseFrontmatter の規則の範囲だけを読む。範囲の外の書き方は推測せず、エラーにする
 //   （例: draft:true、Draft: true、インデントした draft: true を、下書きと読み損ねて公開しないため）
 // 読めないファイルは理由を warn に渡してスキップする（ビルドを止めたいときは、warn で例外を投げる）。
@@ -61,6 +63,9 @@ const MARP_KEY = "marp";
 /** Marp の記事（marp: true）にだけ書けるキー（Marp のグローバルディレクティブ） */
 const MARP_DIRECTIVE_KEYS = new Set(["theme", "paginate", "class", "style", "header", "footer", "size", "math"]);
 const KNOWN_KEYS = [...POST_KEYS, MARP_KEY, ...MARP_DIRECTIVE_KEYS];
+/** 記事のタグのキー。ブログ（作品として読まないとき）だけ書ける。frontmatter から取り除く（Marp の記事でも本文に残さない） */
+const TAGS_KEY = "tags";
+const BLOG_KNOWN_KEYS = [...KNOWN_KEYS, TAGS_KEY];
 /** 作品の付帯情報のキー。作品として読むときだけ書ける。frontmatter から取り除く（Marp の記事でも本文に残さない） */
 const WORK_KEYS = new Set(["badge", "tech", "repository"]);
 const WORK_KNOWN_KEYS = [...KNOWN_KEYS, ...WORK_KEYS];
@@ -68,6 +73,11 @@ const MAX_TITLE_LENGTH = 200;
 const MAX_SUMMARY_LENGTH = 500;
 const MAX_TECH_ITEMS = 10;
 const MAX_TECH_LENGTH = 40;
+const MAX_TAGS = 5;
+/** タグ 1 個の長さの上限。作品の tech の 1 個と同じ */
+const MAX_TAG_LENGTH = MAX_TECH_LENGTH;
+/** タグに使えない文字。空白（全角を含む）、, と / */
+const TAG_FORBIDDEN = /[\s,/]/u;
 const MAX_REPOSITORY_URL_LENGTH = 500;
 /** repository の形。https で、ホスト名（ドットを含む）の後に、空白を含まない ASCII のパスを置ける（ContentLoader と同じ） */
 const REPOSITORY_URL = /^https:\/\/[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:\/[!-~]*)?$/;
@@ -232,6 +242,7 @@ function parsePlain(plain: string): string | boolean | { reason: string } {
  * 下書きと未来の publishedAt も含める（出すかどうかは呼び出し側で決める）。
  * ディレクトリが無ければ空の配列。読めないファイルと . で始まる .md は、理由を warn に渡してスキップする。
  * options.work を付けると作品として読み、作品の付帯情報（badge、tech、repository）を許して WorkFields を付ける。
+ * options.work を付けなければ記事のタグ（tags）を許し、書いた記事にだけ tags を付ける。
  */
 export function loadPostDirectory(dir: string, warn?: (message: string) => void): PostContent[];
 export function loadPostDirectory(
@@ -287,7 +298,7 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
 
   const errors: string[] = [];
   const keys = [...Object.keys(data), ...blockKeys];
-  const knownKeys = work ? WORK_KNOWN_KEYS : KNOWN_KEYS;
+  const knownKeys = work ? WORK_KNOWN_KEYS : BLOG_KNOWN_KEYS;
   for (const key of keys) {
     if (knownKeys.includes(key)) continue;
     const known = knownKeys.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
@@ -296,14 +307,16 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
     );
   }
   for (const key of blockKeys) {
-    if (POST_KEYS.has(key) || key === MARP_KEY || (work && WORK_KEYS.has(key))) {
+    if (POST_KEYS.has(key) || key === MARP_KEY || (work && WORK_KEYS.has(key)) || (!work && key === TAGS_KEY)) {
       errors.push(`${key} はブロック（| や >）にせず 1 行で書く`);
     }
   }
-  // リストは作品の tech にだけ書ける（Marp の指定にリストを書くと、そのまま本文の先頭に残ってしまう）
-  const lists = Object.keys(data).filter((key) => Array.isArray(data[key]) && !WORK_KEYS.has(key));
-  if (lists.length > 0) errors.push(`${lists.join("、")} はリストにせず 1 つの値で書く（リストは tech だけ）`);
+  // リストは作品の tech と記事の tags にだけ書ける（Marp の指定にリストを書くと、そのまま本文の先頭に残る）。
+  // 作品の tags と記事の tech は、上で知らないキーとしてエラーにしてある
+  const lists = Object.keys(data).filter((key) => Array.isArray(data[key]) && !WORK_KEYS.has(key) && key !== TAGS_KEY);
+  if (lists.length > 0) errors.push(`${lists.join("、")} はリストにせず 1 つの値で書く（リストは作品の tech と記事の tags だけ）`);
   const workFields = work ? readWorkFields(data, errors) : undefined;
+  const tags = work ? undefined : readTags(data, errors);
 
   // ブロックで書いたキーは上でエラーにしたので、「ありません」は重ねない
   const missing = (key: string) => !Object.hasOwn(data, key) && !blockKeys.includes(key);
@@ -326,11 +339,11 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
     return errors.join(" / ");
   }
 
-  // Marp の記事は、title などと作品の付帯情報を除いた frontmatter を本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）。
+  // Marp の記事は、title など、作品の付帯情報、記事のタグを除いた frontmatter を本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）。
   // yes / on などで書いた真偽値は true / false に書き直す
   const kept = lines.flatMap((line) => {
     const key = KEY_LINE.exec(line)?.[1];
-    if (key !== undefined && (POST_KEYS.has(key) || WORK_KEYS.has(key))) return [];
+    if (key !== undefined && (POST_KEYS.has(key) || WORK_KEYS.has(key) || key === TAGS_KEY)) return [];
     const value = key !== undefined && Object.hasOwn(data, key) ? data[key] : undefined;
     return typeof value === "boolean" ? [`${key}: ${value}`] : [line];
   });
@@ -343,8 +356,39 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
     publishedAt: publishedAtUtc,
     updatedAt: publishedAtUtc,
     ...(draft === true ? { draft } : {}),
+    ...(tags !== undefined ? { tags } : {}),
     ...workFields,
   };
+}
+
+/**
+ * 記事のタグを読む。書いていなければ undefined。問題は errors に足す。
+ * 1 行のリストで 1〜MAX_TAGS 個、1 個 MAX_TAG_LENGTH 文字まで、TAG_FORBIDDEN の文字を含まない、同じタグは 1 回だけ。
+ * 空のリストと空の要素は parseFrontmatter がエラーにする。ブロックで書いたキーは data に入らない（呼び出し側でエラーにしてある）。
+ */
+function readTags(data: Record<string, FrontmatterValue>, errors: string[]): string[] | undefined {
+  const tags = data[TAGS_KEY];
+  if (tags === undefined) return undefined;
+
+  if (!Array.isArray(tags)) {
+    errors.push("tags は 1 行のリストで書く（例: tags: [aws, TypeScript]）");
+    return undefined;
+  }
+
+  const problem = findTagsProblem(tags);
+  if (problem === undefined) return tags;
+
+  errors.push(problem);
+  return undefined;
+}
+
+/** タグの並びの問題を 1 つ返す。問題が無ければ undefined */
+function findTagsProblem(tags: string[]): string | undefined {
+  if (tags.length > MAX_TAGS) return `tags は ${MAX_TAGS} 個まで`;
+  if (tags.some((tag) => [...tag].length > MAX_TAG_LENGTH)) return `tags の 1 個は ${MAX_TAG_LENGTH} 文字まで`;
+  if (tags.some((tag) => TAG_FORBIDDEN.test(tag))) return "tags の 1 個に空白、「,」、「/」を含めない";
+  if (new Set(tags).size !== tags.length) return "tags に同じタグが 2 回以上あります";
+  return undefined;
 }
 
 /**
