@@ -8,6 +8,7 @@
 // - 本文が MAX_BODY_BYTES を超える
 // - draft: true の記事（下書きはこのリポジトリの外で書く）
 // - publishedAt が未来の記事（予約公開はしない）
+// - NFC に正規化した後のタグが MAX_TAG_LENGTH 文字を超える、または TAG_FORBIDDEN の文字を含む
 // - NFC に正規化すると同じになるタグが、1 つの記事に 2 回以上ある
 //
 // タグは読んだ直後に NFC に正規化する。見た目が同じで文字コードが違うタグ（NFC と NFD）を、同じタグとして数えるため。
@@ -30,6 +31,11 @@ const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /** 本文（Marp の記事は先頭に残す frontmatter を含む）の UTF-8 のバイト数（128KB） */
 const MAX_BODY_BYTES = 128 * 1024;
+
+/** タグ 1 個の文字数の上限。shared/lib/markdown-posts.ts の MAX_TAG_LENGTH と同じ値（export されていないため写す） */
+const MAX_TAG_LENGTH = 40;
+/** タグに使えない文字。空白（全角を含む）、, と /。shared/lib/markdown-posts.ts の TAG_FORBIDDEN と同じ */
+const TAG_FORBIDDEN = /[\s,/]/u;
 
 /**
  * content/blog/ の記事を読んで検査し、サイトに出す記事を公開日時の新しい順（同時刻なら slug 順）に返す。
@@ -70,7 +76,14 @@ function postProblems(post: PostContent, now: Date): string[] {
     problems.push(`${label}: 本文が ${bytes} バイトあります。${MAX_BODY_BYTES} バイト（128KB）までにする（記事を分ける）`);
   }
   // 読み込みの検査（shared/lib/markdown-posts.ts）は正規化の前の値で比べるため、正規化の後にもう一度比べる
-  if (post.tags !== undefined && new Set(post.tags).size !== post.tags.length) {
+  const tags = post.tags ?? [];
+  if (tags.some((tag) => [...tag].length > MAX_TAG_LENGTH)) {
+    problems.push(`${label}: tags の 1 個は ${MAX_TAG_LENGTH} 文字まで（NFC に正規化して数えた結果）`);
+  }
+  if (tags.some((tag) => TAG_FORBIDDEN.test(tag))) {
+    problems.push(`${label}: tags の 1 個に空白、「,」、「/」を含めない（NFC に正規化して調べた結果）`);
+  }
+  if (new Set(tags).size !== tags.length) {
     problems.push(`${label}: tags に同じタグが 2 回以上あります（NFC に正規化して比べた結果）`);
   }
   if (post.draft) {
