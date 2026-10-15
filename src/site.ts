@@ -33,7 +33,7 @@ export const PROFILE_BIO = "自称エンジニア　好きなものはゲーム�
 export const PROFILE_ICON = { path: "/apple-icon.png", size: 56 };
 
 /** portfolio へのリンク（サイドバーのプロフィールとフッターで使う） */
-export const PORTFOLIO_LINK = { href: "https://elysdev.net/", label: "ポートフォリオ" };
+const PORTFOLIO_LINK = { href: "https://elysdev.net/", label: "ポートフォリオ" };
 
 /** サイドバーのプロフィールの下に並べるリンク */
 export const PROFILE_LINKS: readonly { href: string; label: string }[] = [
