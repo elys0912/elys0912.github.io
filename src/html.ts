@@ -47,7 +47,7 @@ import {
 import { groupPostsByTag, type TagArchive } from "./tags.ts";
 
 /** ページの <head> と本文の外側（CSS とスクリプトの URL）に使う、out/ の中のファイルの URL（?v= 付き） */
-export type Assets = { css: string; script: string; marpScript: string };
+type Assets = { css: string; script: string; marpScript: string };
 
 /** どのページにも共通して渡すもの。now はフッターの年に使う */
 export type PageContext = { assets: Assets; now: Date };
@@ -426,7 +426,7 @@ function attr(name: string, value: string | undefined): string {
 }
 
 /** テキストと属性値のエスケープ（React と同じ 5 文字） */
-export function escapeHtml(value: string): string {
+function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => htmlEntities[char]);
 }
 

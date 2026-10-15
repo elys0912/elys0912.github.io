@@ -18,7 +18,7 @@ import {
 import { groupPostsByTag, type TagArchive } from "./tags.ts";
 
 /** フィードに載せる記事の数 */
-export const FEED_ENTRY_LIMIT = 20;
+const FEED_ENTRY_LIMIT = 20;
 
 /**
  * 記事（サイトに出すもの）から Atom 1.0 の XML を返す。公開日時の新しい順に FEED_ENTRY_LIMIT 件まで載せる。
@@ -154,6 +154,6 @@ const xmlEntities: Record<string, string> = {
 };
 
 /** テキストと属性値に入れられるよう、& < > " ' を実体参照にする。XML で使えない制御文字は取り除く */
-export function escapeXml(value: string): string {
+function escapeXml(value: string): string {
   return value.replace(INVALID_XML_CHARS, "").replace(/[&<>"']/g, (char) => xmlEntities[char]);
 }
