@@ -17,25 +17,25 @@ OIDC プロバイダとロールを 2 つ、1 つのスタックに置いた。
 
 デプロイ用のロールは、`sub` がリポジトリの main ブランチのときだけ引き受けられる。権限は、`cdk bootstrap` が作ったロール（deploy、file-publishing、lookup）の AssumeRole だけ。S3 への sync と CloudFront の invalidation は、対象のリソースを持つ側のスタックが、そのバケットとディストリビューションに限定して付ける。
 
-PR 用のロールは `sub` が `pull_request` で、`cdk diff` に要る読み取りだけ。
+PR 用のロールは `sub` が `pull_request` で、`cdk diff` に必要な読み取りだけ。
 
-デプロイ用のロール自身は、このスタックを更新できない。自分の信頼ポリシーを自分で書き換えられる形は、流石にまずいだろ。このスタックの変更は手元から `cdk deploy` する。
+デプロイ用のロール自身は、このスタックを更新できない。自分の信頼ポリシーを書き換えられる形は、流石にまずいだろ。このスタックの変更は手元から `cdk deploy` する。
 
 # Free の private では Environments が使えない
 
 OIDC の `sub` には 2 つの形がある。ブランチで絞る `repo:<repo>:ref:refs/heads/main` と、Environment で絞る `repo:<repo>:environment:production`。
 
-GitHub Free の private リポジトリでは Environments が使えない。なのでブランチの形にした。public にしたら Environment に切り替えたいので、CDK の props で両方を選べるようにしてある。Environment を使うときは、デプロイできるブランチを main に限定する保護ルールが必須。ルールがないと、どのブランチの実行でも environment を名乗れて、ブランチの形より弱くなる。
+GitHub Free の private リポジトリでは Environments が使えない。そのため、ブランチの形にした。public にしたら Environment に切り替えたいので、CDK の props で両方を選べるようにしてある。Environment を使うときは、デプロイできるブランチを main に限定する保護ルールが必須。ルールがないと、どのブランチの実行でも environment を名乗れるので、ブランチの形より弱くなるはずだ。
 
 同じ理由で、main のブランチ保護で CI を必須にもできない。そこで Deploy ワークフローでは、`cdk deploy` の前に backend のテストをもう 1 度ちゃんと通している。
 
 # id-token: write をデプロイのジョブだけに
 
-OIDC のトークンを取るには `id-token: write` が要る。ここが落とし穴で、信頼ポリシーの `sub` は「main ブランチの実行」としか言っていない。main で `id-token: write` を持つワークフローは、どれでもデプロイ用のロールを引き受けられる。
+OIDC のトークンを取るには `id-token: write` が必要。ここが落とし穴で、信頼ポリシーの `sub` は「main ブランチの実行」としか言っていない。main で `id-token: write` を持つワークフローは、どれでもデプロイ用のロールを引き受けられる。
 
 だから `id-token: write` は Deploy ワークフローの deploy ジョブだけに付け、ワークフロー全体の `permissions` は `contents: read` にした。ほかのワークフロー（CI、セキュリティ検査）には付けない。
 
-これは約束じゃなくて、テストにした。infra のテストが `.github/workflows/` の全ファイルを読み、次を検査する。
+これは約束ではなく、テストにした。infra のテストが `.github/workflows/` の全ファイルを読み、次を検査する。
 
 - `id-token: write` を含むファイルが `deploy.yml` だけであること
 - `deploy.yml` の中でも、`jobs:` より前（ワークフロー全体の permissions）に書かれていないこと
@@ -63,6 +63,6 @@ CloudTrail の拒否イベントを見ると、届いた `sub` の形が違っ�
 
 # AI との付き合い方
 
-OIDC の設定は、AI が書いた形がそのまま動くことが多い。動くからこそ、権限の範囲が広すぎても気づきにくいんだよな。ロールの権限を bootstrap のロールの AssumeRole に絞る、`id-token: write` をジョブに絞る、ロール自身にスタックの更新をさせない、の 3 つは AI に任せず自分で範囲を決めた。拒否の原因も、AI の推測じゃなく CloudTrail の拒否イベントと GitHub の設定で確かめた。
+OIDC の設定は、AI が書いた形がそのまま動くことが多い。動くからこそ、権限の範囲が広すぎても気づきにくいんだよな。ロールの権限を bootstrap のロールの AssumeRole に絞る、`id-token: write` をジョブに絞る、ロール自身にスタックの更新をさせない、の 3 つは AI に任せず、範囲を決めたのはこっち。拒否の原因も、AI の推測ではなく CloudTrail の拒否イベントと GitHub の設定で確かめた。
 
 次回は、CloudFront 1 つで静的サイトと API を同居させたときの落とし穴を、スライドにまとめる予定。
