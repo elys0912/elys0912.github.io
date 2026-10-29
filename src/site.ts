@@ -70,14 +70,27 @@ export function tagDescription(tag: string): string {
   return `タグ「${tag}」を付けた記事の一覧`;
 }
 
-/** フッターの著作権の表示の後ろに置くリンク。記事のライセンスの案内と、portfolio */
+/** プライバシーポリシー */
+export const PRIVACY_PATH = "/privacy/";
+export const PRIVACY_TITLE = "プライバシーポリシー";
+
+/** フッターの著作権の表示の後ろに置くリンク。記事のライセンスの案内、プライバシーポリシー、portfolio */
 export const FOOTER_LINKS: readonly { href: string; label: string }[] = [
   {
     href: "https://github.com/elys0912/elys0912.github.io/blob/main/content/LICENSE.md",
     label: "記事のライセンス",
   },
+  { href: PRIVACY_PATH, label: PRIVACY_TITLE },
   PORTFOLIO_LINK,
 ];
+
+/**
+ * アクセス解析（GoatCounter）のサイトのコード。送信先は https://<コード>.goatcounter.com/count。
+ * 集計を見る画面も同じオリジン。portfolio とは別のサイトにしている（どちらにも / があり、混ざるため）
+ */
+const GOATCOUNTER_CODE = "elys-blog";
+const GOATCOUNTER_ORIGIN = `https://${GOATCOUNTER_CODE}.goatcounter.com`;
+export const GOATCOUNTER_ENDPOINT = `${GOATCOUNTER_ORIGIN}/count`;
 
 /** サイト全体の OGP 画像（public/ に置く静的ファイル）。記事ごとの画像は無い */
 export const OG_IMAGE = { path: "/opengraph-image.png", width: 1200, height: 630, alt: SITE_NAME };
@@ -88,6 +101,7 @@ export const OG_IMAGE = { path: "/opengraph-image.png", width: 1200, height: 630
  * - frame-ancestors は外す。meta では無視される（report-uri と sandbox も同じ）
  * - script-src の 'unsafe-inline' は外す。inline の script は無い（site.js と marp-browser.js は外部ファイル。Marp は script: false）
  * - img-src に https: を足す。記事の Markdown の画像（shared/lib/markdown.ts の sanitize が src の https を許可）と Marp の画像は外部の URL を指せる
+ * connect-src の GoatCounter は、アクセス解析の送信先（count.js が navigator.sendBeacon で送る）
  */
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -96,7 +110,7 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  "connect-src 'self'",
+  `connect-src 'self' ${GOATCOUNTER_ORIGIN}`,
   "base-uri 'self'",
   "form-action 'self'",
   "object-src 'none'",

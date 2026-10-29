@@ -1,4 +1,4 @@
-// ページの HTML。トップ（記事一覧）、月別の一覧、タグの一覧とタグごとの一覧、記事、404 と、共通の <head>、ヘッダー、フッター。
+// ページの HTML。トップ（記事一覧）、月別の一覧、タグの一覧とタグごとの一覧、記事、プライバシーポリシー、404 と、共通の <head>、ヘッダー、フッター。
 // HTML の構造と class 名は portfolio（Next.js の React コンポーネント）が出すものにそろえる。
 // 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠、
 // タグのチップのリンク（src/Tags.module.css）。
@@ -23,6 +23,7 @@ import {
   CONTENT_SECURITY_POLICY,
   FEED_PATH,
   FOOTER_LINKS,
+  GOATCOUNTER_ENDPOINT,
   HOME_PATH,
   NAV_ITEMS,
   OG_IMAGE,
@@ -30,6 +31,8 @@ import {
   POST_LIST_LEAD,
   POST_LIST_TITLE,
   postPath,
+  PRIVACY_PATH,
+  PRIVACY_TITLE,
   PROFILE_BIO,
   PROFILE_ICON,
   PROFILE_LINKS,
@@ -47,7 +50,7 @@ import {
 import { groupPostsByTag, type TagArchive } from "./tags.ts";
 
 /** ページの <head> と本文の外側（CSS とスクリプトの URL）に使う、out/ の中のファイルの URL（?v= 付き） */
-type Assets = { css: string; script: string; marpScript: string };
+type Assets = { css: string; script: string; marpScript: string; counterScript: string };
 
 /** どのページにも共通して渡すもの。now はフッターの年に使う */
 export type PageContext = { assets: Assets; now: Date };
@@ -201,6 +204,35 @@ export function notFoundPage(ctx: PageContext): string {
   return page(ctx, { title: "ページが見つかりません", description: SITE_DESCRIPTION, noindex: true }, `${message}${back}`);
 }
 
+/**
+ * プライバシーポリシー。書いてある内容は実装に合わせてある。
+ * - 送るもの：vendor/goatcounter/count.js の get_data（パスとクエリ、タイトル、参照元、画面の幅、自動操作のブラウザかどうか）
+ * - 送り先：src/site.ts の GOATCOUNTER_ENDPOINT と、CSP の connect-src
+ * - GoatCounter が保存するもの：https://www.goatcounter.com/help/privacy と https://www.goatcounter.com/help/sessions（2026-10-29 に確認）。
+ *   GoatCounter の設定（Settings → Data collection）は、Individual pageviews・Region・Language を無効にしている（2026-10-29）
+ * 送るもの・送り先・GoatCounter の設定を変えたら、このページも更新する
+ */
+export function privacyPage(ctx: PageContext): string {
+  const goatcounterPrivacy = `<a href="https://www.goatcounter.com/help/privacy" rel="noopener noreferrer">GoatCounter のプライバシーポリシー</a>`;
+  const main = [
+    `<h1>${escapeHtml(PRIVACY_TITLE)}</h1>`,
+    `<p>このサイトは、アクセス数を数えるために、アクセス解析のサービスの GoatCounter を使っている。閲覧者の情報を集めるのはこれだけで、コメントや問い合わせのフォームなど、入力してもらうものは無い。</p>`,
+    `<h2>送るもの</h2>`,
+    `<p>ページを開くと、ブラウザから GoatCounter に次を送る。</p>`,
+    `<ul><li>見たページのパスと、URL のクエリ（? から後ろ）</li><li>ページのタイトル</li><li>参照元（このページへのリンクがあったページの URL）</li><li>画面の幅</li><li>自動操作のブラウザかどうかの判定</li></ul>`,
+    `<p>通信の仕組み上、GoatCounter には IP アドレスとブラウザの種類（User-Agent）も届く。自分の PC（localhost）で開いたときと、ほかのサイトの枠（iframe）の中で開いたときは送らない。</p>`,
+    `<h2>GoatCounter が保存するもの</h2>`,
+    `<p>保存するのは日ごと・時間ごとの集計で、ページごとの閲覧数、参照元、ブラウザの名前とバージョン、OS、IP アドレスから推定した国、画面の幅。IP アドレスと User-Agent そのものは保存しない。訪れた人の数を数える（同じ人の閲覧かどうかを見分ける）ために、IP アドレスと User-Agent の組をメモリに最長 8 時間置くが、データベースには書かない。1 回ごとの閲覧の記録は取らない設定にしている。</p>`,
+    `<p>データは GoatCounter のサーバー（フィンランドとドイツ）に置かれる。詳しくは ${goatcounterPrivacy} にある。</p>`,
+    `<h2>Cookie とブラウザに保存するもの</h2>`,
+    `<p>Cookie は使わない。GoatCounter のスクリプトは、ブラウザの localStorage の skipgc（作者が自分の閲覧を数えないための設定）を読む。書き込むのは、URL の末尾に #toggle-goatcounter を付けて開いたときだけ。</p>`,
+    `<h2>変更</h2>`,
+    `<p>この内容を変えるときは、このページを更新する。最終更新日：<time datetime="2026-10-29">2026-10-29</time></p>`,
+  ].join("");
+
+  return page(ctx, { title: PRIVACY_TITLE, description: "このサイトが集める情報と、アクセス解析（GoatCounter）に送るもの", path: PRIVACY_PATH }, main);
+}
+
 /** 目次。項目は本文の h2。初期表示では最初の見出しを現在地にする（現在地の追従は src/client.js） */
 function tableOfContents(headings: readonly Heading[]): string {
   const items = headings.map((heading, index) => {
@@ -295,9 +327,13 @@ function marpDeck(markdown: string, assets: Assets): string {
   return `<div${cls("MarpDeck", "deck")}><style>${css}</style><div>${html}</div></div><script src="${assets.marpScript}" defer></script>`;
 }
 
-/** ページ全体。head.path はナビの現在地（aria-current）の判定にも使う */
+/**
+ * ページ全体。head.path はナビの現在地（aria-current）の判定にも使う。
+ * どのページも GoatCounter の count.js を読み、開いたときに 1 回数える（送るものは /privacy/ に書いた）
+ */
 function page({ assets, now }: PageContext, head: HeadOptions, main: string): string {
-  const body = `${siteHeader(head.path)}<main${cls("layout", "main")}>${main}</main>${siteFooter(now)}<script src="${assets.script}" defer></script>`;
+  const counter = `<script data-goatcounter="${escapeHtml(GOATCOUNTER_ENDPOINT)}" src="${assets.counterScript}" async></script>`;
+  const body = `${siteHeader(head.path)}<main${cls("layout", "main")}>${main}</main>${siteFooter(now)}<script src="${assets.script}" defer></script>${counter}`;
 
   return `<!DOCTYPE html><html lang="ja"><head>${headTags(head, assets)}</head><body>${body}</body></html>\n`;
 }

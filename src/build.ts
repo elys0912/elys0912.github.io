@@ -7,11 +7,13 @@
 //   archive/<yyyy>/<mm>/index.html  月別の記事一覧（記事のある月だけ）
 //   tags/index.html          タグの一覧（タグが無くても書く。ナビから案内するため）
 //   tags/<タグ>/index.html   タグごとの記事一覧（ディレクトリ名はタグの文字のまま）
+//   privacy/index.html       プライバシーポリシー
 //   404.html、404/index.html ページが見つからないとき（GitHub Pages は 404.html を返す）
 //   feed.xml、sitemap.xml、robots.txt
 //   assets/site.css          shared/ と src/ の CSS を 1 本にしたもの（src/css.ts）
 //   assets/site.js           src/client.js
 //   assets/marp-browser.js   marp-core の browser script（Marp の記事だけが読む。先頭に marp-core の LICENSE を付ける）
+//   assets/goatcounter.js    vendor/goatcounter/count.js（アクセス解析。全ページが読む。先頭に出典と ISC License がある）
 //   images/<slug>/…          content/images/ のうち、公開した記事から参照されている画像
 //   public/ の中身           favicon.ico、icon.svg、apple-icon.png、opengraph-image.png
 //
@@ -28,10 +30,10 @@ import type { PostContent } from "../shared/lib/post-types.ts";
 import { groupPostsByMonth } from "./archive.ts";
 import { buildCss, missingClassNames } from "./css.ts";
 import { buildAtomFeed, buildRobots, buildSitemap } from "./feed.ts";
-import { archivePage, homePage, notFoundPage, postPage, tagIndexPage, tagPage, type PageContext } from "./html.ts";
+import { archivePage, homePage, notFoundPage, postPage, privacyPage, tagIndexPage, tagPage, type PageContext } from "./html.ts";
 import { imageReferences } from "./images.ts";
 import { CONTENT_DIRECTORY, IMAGES_DIRECTORY_NAME, loadPosts, POSTS_DIRECTORY_NAME } from "./posts.ts";
-import { archivePath, HOME_PATH, postPath, SITE_URL, TAG_INDEX_PATH, tagPath } from "./site.ts";
+import { archivePath, HOME_PATH, postPath, PRIVACY_PATH, SITE_URL, TAG_INDEX_PATH, tagPath } from "./site.ts";
 import { groupPostsByTag } from "./tags.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -77,6 +79,7 @@ function writeSite(posts: readonly PostContent[], now: Date): number {
     css: writeAsset("site.css", buildCss(root)),
     script: writeAsset("site.js", readFileSync(path.join(root, "src", "client.js"), "utf8")),
     marpScript: writeAsset("marp-browser.js", marpBrowserScript()),
+    counterScript: writeAsset("goatcounter.js", readFileSync(path.join(root, "vendor", "goatcounter", "count.js"), "utf8")),
   };
   const ctx: PageContext = { assets, now };
 
@@ -84,6 +87,7 @@ function writeSite(posts: readonly PostContent[], now: Date): number {
   for (const post of posts) writePage(postPath(post.slug), postPage(post, ctx));
   for (const archive of groupPostsByMonth(posts)) writePage(archivePath(archive.month), archivePage(archive, posts, ctx));
   writePage(TAG_INDEX_PATH, tagIndexPage(posts, ctx));
+  writePage(PRIVACY_PATH, privacyPage(ctx));
   for (const archive of groupPostsByTag(posts)) writePage(tagPath(archive.tag), tagPage(archive, posts, ctx));
   const notFound = notFoundPage(ctx);
   writeFileSync(path.join(outDir, "404.html"), notFound);
