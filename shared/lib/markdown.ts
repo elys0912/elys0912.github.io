@@ -16,7 +16,7 @@ const tableCellAlign: [string, ...string[]] = ["align", "left", "center", "right
  * id と name は許可しないので、ページ内の要素を上書き（DOM clobbering）されることもない。
  * h1 はページのタイトル専用なので許可しない（本文の見出しは rehypeShiftHeadings で h2 以下になる）。
  */
-export const sanitizeSchema: SanitizeSchema = {
+const sanitizeSchema: SanitizeSchema = {
   tagNames: [
     "h2", "h3", "h4", "h5", "h6",
     "p", "br", "hr",
@@ -66,6 +66,10 @@ const processor = unified()
   .use(rehypeStringify)
   .freeze();
 
+/**
+ * Markdown をサニタイズ済みの HTML にする（目次の id は付けない）。
+ * 本番の表示は renderMarkdownWithHeadings を通る。これはサニタイズと変換の結果を単体で確かめるテストのために公開している
+ */
 export function renderMarkdown(markdown: string): string {
   return String(processor.processSync(markdown));
 }
@@ -129,9 +133,15 @@ function forEachElement(node: Root | Element, callback: (element: Element) => vo
 }
 
 function textContent(node: Element): string {
-  return node.children
-    .map((child) => (child.type === "text" ? child.value : child.type === "element" ? textContent(child) : ""))
-    .join("");
+  return node.children.map(childText).join("");
+}
+
+/** 子のノードの文字。テキストはそのまま、要素は中の文字、それ以外（コメントなど）は空 */
+function childText(child: Element["children"][number]): string {
+  if (child.type === "text") return child.value;
+  if (child.type === "element") return textContent(child);
+
+  return "";
 }
 
 // http(s):// とスキーム省略の //host/ を外部リンクとして扱う

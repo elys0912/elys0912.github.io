@@ -83,7 +83,7 @@ export function buildCss(root: string): string {
  */
 export function classOf(module: ModuleName, name: string): string | undefined {
   const classes = classMap.get(module);
-  if (!classes) throw new Error(`${module}.module.css を読む前に class 名を引いています`);
+  if (classes === undefined) throw new Error(`${module}.module.css を読む前に class 名を引いています`);
 
   const scoped = classes.get(name);
   if (scoped === undefined) missingClasses.add(`${module}.${name}`);

@@ -141,47 +141,56 @@ export function parseFrontmatter(text: string): ParsedMarkdown | string {
   if (end < 0) return "frontmatter の閉じの --- がありません";
 
   const lines = all.slice(1, end);
-  // Map で集めて最後にオブジェクトにする（__proto__ のようなキーも、自前のプロパティとして残すため）
-  const data = new Map<string, FrontmatterValue>();
-  const blockKeys: string[] = [];
-  const seen = new Set<string>();
-  const errors: string[] = [];
-  // ブロックの中にいる間だけある
-  let block: Block | undefined;
-  lines.forEach((line, index) => {
-    const where = `frontmatter の ${index + 2} 行目`;
-    if (FORBIDDEN_CHARACTER.test(line)) {
-      errors.push(`${where}: 制御文字など、使えない文字があります`);
-      block = undefined;
-      return;
-    }
-    if (block && acceptBlockLine(block, line, where, errors)) return;
-    // インデントの無い行でブロックは終わる。この行は最上位の行として続けて読む
-    block = undefined;
-    if (/^ *$/.test(line) || line.startsWith("#")) return;
-    if (line.startsWith(" ") || line.startsWith("\t")) {
-      errors.push(`${where}: インデントした行は読めません（キーは行頭から書く）: ${line.trim()}`);
-      return;
-    }
-    const match = KEY_LINE.exec(line);
-    if (!match) {
-      errors.push(`${where}: 「key: value」の形で読めません（コロンの後に空白を入れる）: ${line}`);
-      return;
-    }
-    const [, key, value = ""] = match;
-    if (seen.has(key)) errors.push(`${where}: ${key} が 2 回以上あります`);
-    seen.add(key);
-    if (BLOCK_HEADER.test(value)) {
-      blockKeys.push(key);
-      block = {};
-      return;
-    }
-    const scalar = parseScalar(value);
-    if (typeof scalar === "object" && !Array.isArray(scalar)) errors.push(`${where}: ${key} の${scalar.reason}`);
-    else data.set(key, scalar);
-  });
-  if (errors.length > 0) return errors.join(" / ");
-  return { data: Object.fromEntries(data), blockKeys, lines, body: all.slice(end + 1).join("\n") };
+  const state: FrontmatterState = { data: new Map(), blockKeys: [], seen: new Set(), errors: [], block: undefined };
+  lines.forEach((line, index) => readFrontmatterLine(line, `frontmatter の ${index + 2} 行目`, state));
+  if (state.errors.length > 0) return state.errors.join(" / ");
+
+  return { data: Object.fromEntries(state.data), blockKeys: state.blockKeys, lines, body: all.slice(end + 1).join("\n") };
+}
+
+/** parseFrontmatter が frontmatter の行を読みながら更新する状態 */
+type FrontmatterState = {
+  /** Map で集めて最後にオブジェクトにする（__proto__ のようなキーも、自前のプロパティとして残すため） */
+  data: Map<string, FrontmatterValue>;
+  blockKeys: string[];
+  seen: Set<string>;
+  errors: string[];
+  /** ブロックの中にいる間だけある */
+  block: Block | undefined;
+};
+
+/** frontmatter の 1 行を読み、state を更新する。where はエラーの文言に付ける行の位置 */
+function readFrontmatterLine(line: string, where: string, state: FrontmatterState): void {
+  const { errors } = state;
+  if (FORBIDDEN_CHARACTER.test(line)) {
+    errors.push(`${where}: 制御文字など、使えない文字があります`);
+    state.block = undefined;
+    return;
+  }
+  if (state.block && acceptBlockLine(state.block, line, where, errors)) return;
+  // インデントの無い行でブロックは終わる。この行は最上位の行として続けて読む
+  state.block = undefined;
+  if (/^ *$/.test(line) || line.startsWith("#")) return;
+  if (line.startsWith(" ") || line.startsWith("\t")) {
+    errors.push(`${where}: インデントした行は読めません（キーは行頭から書く）: ${line.trim()}`);
+    return;
+  }
+  const match = KEY_LINE.exec(line);
+  if (!match) {
+    errors.push(`${where}: 「key: value」の形で読めません（コロンの後に空白を入れる）: ${line}`);
+    return;
+  }
+  const [, key, value = ""] = match;
+  if (state.seen.has(key)) errors.push(`${where}: ${key} が 2 回以上あります`);
+  state.seen.add(key);
+  if (BLOCK_HEADER.test(value)) {
+    state.blockKeys.push(key);
+    state.block = {};
+    return;
+  }
+  const scalar = parseScalar(value);
+  if (typeof scalar === "object" && !Array.isArray(scalar)) errors.push(`${where}: ${key} の${scalar.reason}`);
+  else state.data.set(key, scalar);
 }
 
 /** ブロック（`|` や `>`）の続きの行を読む状態。indent は最初の行のインデント（最初の行を読むまでは undefined） */
@@ -313,44 +322,59 @@ function parsePost(bytes: Uint8Array, slug: string, work: boolean): PostContent 
   if (text === undefined) return "UTF-8 として読めません";
   const parsed = parseFrontmatter(text);
   if (typeof parsed === "string") return parsed;
-  const { data, blockKeys, lines, body } = parsed;
 
+  const { data, blockKeys } = parsed;
   const errors: string[] = [];
   const keys = [...Object.keys(data), ...blockKeys];
-  checkKeys(data, blockKeys, work, errors);
+  checkKeys(keys, data, blockKeys, work, errors);
   const workFields = work ? readWorkFields(data, errors) : undefined;
   const tags = work ? undefined : readTags(data, errors);
+  const fields = readPostFields(parsed, keys, errors);
+  if (errors.length > 0 || fields === undefined) return errors.join(" / ");
 
-  // ブロックで書いたキーは上でエラーにしたので、「ありません」は重ねない
-  const missing = (key: string) => !Object.hasOwn(data, key) && !blockKeys.includes(key);
-  const { title, summary, publishedAt, draft = false, marp = false } = data;
-  checkText("title", title, MAX_TITLE_LENGTH, missing("title"), errors);
-  checkText("summary", summary, MAX_SUMMARY_LENGTH, missing("summary"), errors);
-  const publishedAtUtc = readPublishedAt(publishedAt, missing("publishedAt"), errors);
+  const { title, summary, publishedAt, draft, marp } = fields;
+  return {
+    slug,
+    title,
+    summary,
+    bodyMarkdown: postBodyMarkdown(parsed, marp),
+    publishedAt,
+    updatedAt: publishedAt,
+    ...(draft ? { draft } : {}),
+    ...(tags !== undefined ? { tags } : {}),
+    ...workFields,
+  };
+}
+
+/** どの記事にもある項目。publishedAt は UTC の ISO 文字列 */
+type PostFields = { title: string; summary: string; publishedAt: string; draft: boolean; marp: boolean };
+
+/**
+ * どの記事にもある項目（title、summary、publishedAt、draft、marp）と、Marp の指定を書けるかを検査して読む。
+ * 問題は errors に足す。型が合わない項目があれば undefined。keys は data のキーと blockKeys を並べたもの
+ */
+function readPostFields(parsed: ParsedMarkdown, keys: string[], errors: string[]): PostFields | undefined {
+  const { title, summary, draft = false, marp = false } = parsed.data;
+  checkText(parsed, "title", MAX_TITLE_LENGTH, errors);
+  checkText(parsed, "summary", MAX_SUMMARY_LENGTH, errors);
+  const publishedAt = readPublishedAt(parsed, errors);
   if (typeof draft !== "boolean") errors.push("draft は true か false で書く");
   if (typeof marp !== "boolean") errors.push("marp は true か false で書く");
   if (marp !== true) {
     const directives = keys.filter((key) => MARP_DIRECTIVE_KEYS.has(key));
     if (directives.length > 0) errors.push(`${directives.join("、")} は Marp の記事（marp: true）にだけ書ける`);
   }
-  // 型の絞り込みのための条件（errors が空なら、title と summary は文字列、publishedAtUtc はある）
-  if (errors.length > 0 || typeof title !== "string" || typeof summary !== "string" || publishedAtUtc === undefined) {
-    return errors.join(" / ");
-  }
+  // 型の絞り込みのための条件（errors が空なら、title と summary は文字列、publishedAt はある）
+  if (typeof title !== "string" || typeof summary !== "string" || publishedAt === undefined) return undefined;
 
-  // Marp の記事は、frontmatter の残りを本文の先頭に残す（lib/marp.ts が marp: true を見て判定する）
-  const bodyMarkdown = marp === true ? [DELIMITER, ...keepMarpFrontmatterLines(lines, data), DELIMITER, body].join("\n") : body;
-  return {
-    slug,
-    title,
-    summary,
-    bodyMarkdown,
-    publishedAt: publishedAtUtc,
-    updatedAt: publishedAtUtc,
-    ...(draft === true ? { draft } : {}),
-    ...(tags !== undefined ? { tags } : {}),
-    ...workFields,
-  };
+  return { title, summary, publishedAt, draft: draft === true, marp: marp === true };
+}
+
+/** 記事の本文。Marp の記事は、frontmatter の残りを本文の先頭に残す（lib/marp.ts が marp: true を見て判定する） */
+function postBodyMarkdown({ data, lines, body }: ParsedMarkdown, marp: boolean): string {
+  if (!marp) return body;
+
+  return [DELIMITER, ...keepMarpFrontmatterLines(lines, data), DELIMITER, body].join("\n");
 }
 
 /** UTF-8 として読む。読めなければ undefined */
@@ -363,10 +387,19 @@ function decodeUtf8(bytes: Uint8Array): string | undefined {
   }
 }
 
-/** キーの種類を検査する（知らないキー、ブロックにできないキー、リストにできないキー）。問題は errors に足す */
-function checkKeys(data: Record<string, FrontmatterValue>, blockKeys: string[], work: boolean, errors: string[]): void {
+/**
+ * キーの種類を検査する（知らないキー、ブロックにできないキー、リストにできないキー）。問題は errors に足す。
+ * keys は data のキーと blockKeys を並べたもの
+ */
+function checkKeys(
+  keys: string[],
+  data: Record<string, FrontmatterValue>,
+  blockKeys: string[],
+  work: boolean,
+  errors: string[],
+): void {
   const knownKeys = work ? WORK_KNOWN_KEYS : BLOG_KNOWN_KEYS;
-  for (const key of [...Object.keys(data), ...blockKeys]) {
+  for (const key of keys) {
     if (knownKeys.includes(key)) continue;
     const known = knownKeys.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
     errors.push(
@@ -397,36 +430,79 @@ function keepMarpFrontmatterLines(lines: string[], data: Record<string, Frontmat
   });
 }
 
+/** 1 行のリストで書く値（記事の tags、作品の tech）の規則。文言は key と itemName から組み立てる */
+type StringListRule = {
+  key: string;
+  /** 「1 行のリストで書く」の例に出す要素 */
+  example: string;
+  maxItems: number;
+  /** 1 個の長さの上限。コードポイントで数える */
+  maxLength: number;
+  /** 「同じ〇〇が 2 回以上」の〇〇 */
+  itemName: string;
+  /** 1 個に含めない文字と、その説明 */
+  forbidden?: { pattern: RegExp; description: string };
+  /** 検査の前に各要素へ当てる正規化。検査も戻り値も正規化した後の値を使う */
+  normalize?: (item: string) => string;
+};
+
 /**
- * 記事のタグを読む。書いていなければ undefined。問題は errors に足す。
- * 1 行のリストで 1〜MAX_TAGS 個、1 個 MAX_TAG_LENGTH 文字まで、TAG_FORBIDDEN の文字を含まない、同じタグは 1 回だけ。
+ * 記事のタグの規則。1 行のリストで 1〜MAX_TAGS 個、1 個 MAX_TAG_LENGTH 文字まで、TAG_FORBIDDEN の文字を含まない、同じタグは 1 回だけ。
  * 各タグは NFC に正規化してから検査し、正規化した値を返す。見た目が同じで文字コードが違うタグ（NFC と NFD）を、
  * 同じ文字数で数え、同じタグとして比べるため（例: NFD の「が」は 2 文字ではなく 1 文字と数える）。
+ */
+const TAGS_RULE: StringListRule = {
+  key: TAGS_KEY,
+  example: "aws, TypeScript",
+  maxItems: MAX_TAGS,
+  maxLength: MAX_TAG_LENGTH,
+  itemName: "タグ",
+  forbidden: { pattern: TAG_FORBIDDEN, description: "空白、「,」、「/」" },
+  normalize: (tag) => tag.normalize("NFC"),
+};
+
+/** 作品の tech の規則。1 行のリストで 1〜MAX_TECH_ITEMS 個、1 個 MAX_TECH_LENGTH 文字まで、同じ語は 1 回だけ */
+const TECH_RULE: StringListRule = {
+  key: "tech",
+  example: "TypeScript, Node.js",
+  maxItems: MAX_TECH_ITEMS,
+  maxLength: MAX_TECH_LENGTH,
+  itemName: "語",
+};
+
+/**
+ * 記事のタグを読む（TAGS_RULE）。書いていないか問題があれば undefined。問題は errors に足す。
  * 空のリストと空の要素は parseFrontmatter がエラーにする。ブロックで書いたキーは data に入らない（呼び出し側でエラーにしてある）。
  */
 function readTags(data: Record<string, FrontmatterValue>, errors: string[]): string[] | undefined {
-  const tags = data[TAGS_KEY];
-  if (tags === undefined) return undefined;
+  return readStringList(data[TAGS_KEY], TAGS_RULE, errors);
+}
 
-  if (!Array.isArray(tags)) {
-    errors.push("tags は 1 行のリストで書く（例: tags: [aws, TypeScript]）");
+/** 1 行のリストで書く値を rule で検査して読む。書いていないか問題があれば undefined。問題は errors に足す */
+function readStringList(value: FrontmatterValue | undefined, rule: StringListRule, errors: string[]): string[] | undefined {
+  if (value === undefined) return undefined;
+
+  if (!Array.isArray(value)) {
+    errors.push(`${rule.key} は 1 行のリストで書く（例: ${rule.key}: [${rule.example}]）`);
     return undefined;
   }
 
-  const normalizedTags = tags.map((tag) => tag.normalize("NFC"));
-  const problem = findTagsProblem(normalizedTags);
-  if (problem === undefined) return normalizedTags;
+  const items = rule.normalize === undefined ? value : value.map(rule.normalize);
+  const problem = findStringListProblem(items, rule);
+  if (problem === undefined) return items;
 
   errors.push(problem);
   return undefined;
 }
 
-/** NFC に正規化したタグの並びの問題を 1 つ返す。問題が無ければ undefined */
-function findTagsProblem(tags: string[]): string | undefined {
-  if (tags.length > MAX_TAGS) return `tags は ${MAX_TAGS} 個まで`;
-  if (tags.some((tag) => [...tag].length > MAX_TAG_LENGTH)) return `tags の 1 個は ${MAX_TAG_LENGTH} 文字まで`;
-  if (tags.some((tag) => TAG_FORBIDDEN.test(tag))) return "tags の 1 個に空白、「,」、「/」を含めない";
-  if (new Set(tags).size !== tags.length) return "tags に同じタグが 2 回以上あります";
+/** リストの問題を 1 つ返す（個数、長さ、使えない文字、重複の順に見る）。問題が無ければ undefined */
+function findStringListProblem(items: string[], { key, maxItems, maxLength, itemName, forbidden }: StringListRule): string | undefined {
+  if (items.length > maxItems) return `${key} は ${maxItems} 個まで`;
+  if (items.some((item) => [...item].length > maxLength)) return `${key} の 1 個は ${maxLength} 文字まで`;
+  if (forbidden !== undefined && items.some((item) => forbidden.pattern.test(item))) {
+    return `${key} の 1 個に${forbidden.description}を含めない`;
+  }
+  if (new Set(items).size !== items.length) return `${key} に同じ${itemName}が 2 回以上あります`;
   return undefined;
 }
 
@@ -456,28 +532,9 @@ function readWorkFields(data: Record<string, FrontmatterValue>, errors: string[]
   return fields;
 }
 
-/** 作品の tech を読む。書いていないか問題があれば空。問題は errors に足す */
+/** 作品の tech を読む（TECH_RULE）。書いていないか問題があれば空。問題は errors に足す */
 function readTech(tech: FrontmatterValue | undefined, errors: string[]): string[] {
-  if (tech === undefined) return [];
-
-  if (!Array.isArray(tech)) {
-    errors.push("tech は 1 行のリストで書く（例: tech: [TypeScript, Node.js]）");
-    return [];
-  }
-
-  const problem = findTechProblem(tech);
-  if (problem === undefined) return tech;
-
-  errors.push(problem);
-  return [];
-}
-
-/** tech のリストの問題を 1 つ返す。問題が無ければ undefined */
-function findTechProblem(tech: string[]): string | undefined {
-  if (tech.length > MAX_TECH_ITEMS) return `tech は ${MAX_TECH_ITEMS} 個まで`;
-  if (tech.some((item) => [...item].length > MAX_TECH_LENGTH)) return `tech の 1 個は ${MAX_TECH_LENGTH} 文字まで`;
-  if (new Set(tech).size !== tech.length) return "tech に同じ語が 2 回以上あります";
-  return undefined;
+  return readStringList(tech, TECH_RULE, errors) ?? [];
 }
 
 function isRepositoryUrl(value: FrontmatterValue): value is string {
@@ -488,24 +545,28 @@ function isWorkBadge(value: string): value is WorkBadge {
   return (WORK_BADGES as readonly string[]).includes(value);
 }
 
-/** 必須の文字列。空白だけは不可、長さはコードポイントで数える */
-function checkText(
-  key: string,
-  value: FrontmatterValue | undefined,
-  maxLength: number,
-  missing: boolean,
-  errors: string[],
-): void {
-  if (missing) errors.push(`${key} がありません`);
+/** frontmatter で読んだ値（data）と、ブロックで書いたキー（blockKeys） */
+type FrontmatterFields = Pick<ParsedMarkdown, "data" | "blockKeys">;
+
+/** key を書いていないか。ブロックで書いたキーは checkKeys でエラーにしたので、「ありません」は重ねない */
+function isMissing({ data, blockKeys }: FrontmatterFields, key: string): boolean {
+  return !Object.hasOwn(data, key) && !blockKeys.includes(key);
+}
+
+/** 必須の文字列 key を検査する。空白だけは不可、長さはコードポイントで数える。問題は errors に足す */
+function checkText(fields: FrontmatterFields, key: string, maxLength: number, errors: string[]): void {
+  const value = fields.data[key];
+  if (isMissing(fields, key)) errors.push(`${key} がありません`);
   else if (value === undefined) return;
   else if (typeof value !== "string" || BLANK.test(value)) errors.push(`${key} は空でない文字列で書く`);
   else if ([...value].length > maxLength) errors.push(`${key} は ${maxLength} 文字まで`);
 }
 
 /** publishedAt を UTC の ISO 文字列にする。読めなければ undefined。問題は errors に足す */
-function readPublishedAt(value: FrontmatterValue | undefined, missing: boolean, errors: string[]): string | undefined {
+function readPublishedAt(fields: FrontmatterFields, errors: string[]): string | undefined {
+  const value = fields.data.publishedAt;
   const utc = typeof value === "string" ? toUtc(value) : undefined;
-  if (missing) errors.push("publishedAt がありません");
+  if (isMissing(fields, "publishedAt")) errors.push("publishedAt がありません");
   else if (value !== undefined && utc === undefined) {
     errors.push(`publishedAt をオフセット付きの ISO 8601 として読めません（例: 2026-10-10T09:00:00+09:00）: ${value}`);
   }

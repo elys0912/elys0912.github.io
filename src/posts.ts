@@ -48,6 +48,14 @@ export function loadPosts(contentDir: string, now: Date): PostContent[] {
   return posts.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt) || a.slug.localeCompare(b.slug));
 }
 
+/**
+ * 公開後に更新したか（updatedAt が publishedAt より後か）。日時だけを比べ、日本時間の日付が同じかは見ない。
+ * 画面の更新日、article:modified_time、Atom の entry の updated の判定に使う
+ */
+export function isUpdatedAfterPublished(publishedAt: string, updatedAt: string): boolean {
+  return Date.parse(updatedAt) > Date.parse(publishedAt);
+}
+
 /** 1 記事分の、ブログの規則に合わない点 */
 function postProblems(post: PostContent, now: Date): string[] {
   const label = `${POSTS_DIRECTORY_NAME}/${post.slug}.md`;

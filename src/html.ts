@@ -8,12 +8,13 @@
 // Marp の HTML は shared/lib/marp.ts が html: false（生の HTML はエスケープ）で変換済み。この 2 つはそのまま埋め込む。
 // ただし Marp は html: false でも、記事の <style> をスライドの CSS に、HTML のコメントをディレクティブとして読む。
 
-import { formatDate } from "../shared/lib/format.ts";
+import { formatDate, formatYear } from "../shared/lib/format.ts";
 import { renderMarkdownWithHeadings, type Heading } from "../shared/lib/markdown.ts";
 import { isMarpMarkdown, renderMarp } from "../shared/lib/marp.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
 import { groupPostsByMonth, type MonthArchive } from "./archive.ts";
 import { classOf, type ModuleName } from "./css.ts";
+import { isUpdatedAfterPublished } from "./posts.ts";
 import {
   absoluteUrl,
   archiveDescription,
@@ -67,35 +68,30 @@ type HeadOptions = {
 
 /** トップページ（記事一覧） */
 export function homePage(posts: readonly PostContent[], ctx: PageContext): string {
+  const head = { description: SITE_DESCRIPTION, path: HOME_PATH };
   const heading = postListHeading(POST_LIST_TITLE, posts.length);
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(POST_LIST_LEAD)}</p>`;
-  const list = postList(posts);
 
-  return page(ctx, { description: SITE_DESCRIPTION, path: HOME_PATH }, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: POST_LIST_LEAD, list: postList(posts) }, posts);
 }
 
 /** 月別の一覧ページ。見た目はトップと同じ部品。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
 export function archivePage(archive: MonthArchive, posts: readonly PostContent[], ctx: PageContext): string {
   const title = archiveTitle(archive.month);
   const description = archiveDescription(archive.month);
-  const heading = postListHeading(title, archive.posts.length);
-  // 説明文は見出しと一覧のあいだの余白も兼ねる（PostList の .lead の margin）
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(description)}</p>`;
-  const list = postList(archive.posts);
   const head = { title, description, path: archivePath(archive.month) };
+  const heading = postListHeading(title, archive.posts.length);
 
-  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: description, list: postList(archive.posts) }, posts);
 }
 
 /** タグの一覧ページ（/tags/）。タグと記事の件数を、記事の多い順に並べる。posts はサイドバーの部品に使う公開済みの全記事（新しい順） */
 export function tagIndexPage(posts: readonly PostContent[], ctx: PageContext): string {
   const tags = groupPostsByTag(posts);
-  const heading = postListHeading(TAGS_TITLE, tags.length, "個");
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(TAG_INDEX_DESCRIPTION)}</p>`;
-  const list = tags.length === 0 ? `<p${cls("PostList", "empty")}>${escapeHtml(TAG_INDEX_EMPTY_TEXT)}</p>` : tagIndexList(tags);
   const head = { title: TAGS_TITLE, description: TAG_INDEX_DESCRIPTION, path: TAG_INDEX_PATH };
+  const heading = postListHeading(TAGS_TITLE, tags.length, "個");
+  const list = tags.length === 0 ? `<p${cls("PostList", "empty")}>${escapeHtml(TAG_INDEX_EMPTY_TEXT)}</p>` : tagIndexList(tags);
 
-  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: TAG_INDEX_DESCRIPTION, list }, posts);
 }
 
 /** タグの一覧。チップと同じ見た目で、文字を大きくする */
@@ -110,12 +106,21 @@ function tagIndexList(tags: readonly TagArchive[]): string {
 export function tagPage(archive: TagArchive, posts: readonly PostContent[], ctx: PageContext): string {
   const title = tagTitle(archive.tag);
   const description = tagDescription(archive.tag);
-  const heading = postListHeading(title, archive.posts.length);
-  const lead = `<p${cls("PostList", "lead")}>${escapeHtml(description)}</p>`;
-  const list = postList(archive.posts);
   const head = { title, description, path: tagPath(archive.tag) };
+  const heading = postListHeading(title, archive.posts.length);
 
-  return page(ctx, head, withSidebar(`${heading}${lead}${list}`, posts));
+  return listPage(ctx, head, { heading, lead: description, list: postList(archive.posts) }, posts);
+}
+
+/** 一覧のページの中身。heading は postListHeading、lead は説明文（エスケープ前）、list は一覧の HTML */
+type ListPageBody = { heading: string; lead: string; list: string };
+
+/** 一覧のページ（トップ、月別、タグの一覧、タグごと）。見出し・説明文・一覧を、右にサイドバーを置いた 2 列で包む */
+function listPage(ctx: PageContext, head: HeadOptions, { heading, lead, list }: ListPageBody, posts: readonly PostContent[]): string {
+  // 説明文は見出しと一覧のあいだの余白も兼ねる（PostList の .lead の margin）
+  const leadHtml = `<p${cls("PostList", "lead")}>${escapeHtml(lead)}</p>`;
+
+  return page(ctx, head, withSidebar(`${heading}${leadHtml}${list}`, posts));
 }
 
 /** 記事一覧の見出しと件数。unit は件数の単位 */
@@ -137,7 +142,7 @@ function withSidebar(content: string, posts: readonly PostContent[]): string {
 
 /** 記事一覧の 1 件 */
 function postCard(post: PostContent): string {
-  const cardClass = [classOf("PostList", "card"), classOf("PostList", "post")].filter(Boolean).join(" ");
+  const cardClass = classList(["PostList", "card"], ["PostList", "post"]);
   const title = `<h2${cls("PostList", "title")}><a href="${escapeHtml(postPath(post.slug))}">${escapeHtml(post.title)}</a></h2>`;
   const summary = `<p${cls("PostList", "summary")}>${escapeHtml(post.summary)}</p>`;
   const date = `<time datetime="${escapeHtml(post.publishedAt)}"${cls("PostList", "date")}>${formatDate(post.publishedAt)}</time>`;
@@ -190,7 +195,7 @@ function postDates(post: PostContent): string {
   const updatedDate = formatDate(post.updatedAt);
   const published = `<span>公開日 <time datetime="${escapeHtml(post.publishedAt)}">${publishedDate}</time></span>`;
   // 日本時間で公開日と違う日に更新したときだけ出す。公開後の更新に限る
-  const isUpdateShown = updatedDate !== publishedDate && Date.parse(post.updatedAt) > Date.parse(post.publishedAt);
+  const isUpdateShown = updatedDate !== publishedDate && isUpdatedAfterPublished(post.publishedAt, post.updatedAt);
   const updated = isUpdateShown ? `<span>更新日 <time datetime="${escapeHtml(post.updatedAt)}">${updatedDate}</time></span>` : "";
 
   return `<p${cls("PostDetail", "dates")}>${published}${updated}</p>`;
@@ -387,7 +392,7 @@ function headTags({ title, description, path, article, noindex }: HeadOptions, a
 function modifiedTime(article: HeadOptions["article"]): string | undefined {
   if (article === undefined) return undefined;
 
-  return Date.parse(article.updatedTime) > Date.parse(article.publishedTime) ? article.updatedTime : undefined;
+  return isUpdatedAfterPublished(article.publishedTime, article.updatedTime) ? article.updatedTime : undefined;
 }
 
 function meta(attrs: Record<string, string>): string {
@@ -429,7 +434,7 @@ function currentNavHref(currentPath: string | undefined): string | undefined {
  * フッター。著作権の表示の年は日本時間で数える。ビルド環境（CI は UTC）の時差の影響を避けるため。
  */
 function siteFooter(now: Date): string {
-  const year = formatDate(now.toISOString()).slice(0, 4);
+  const year = formatYear(now);
   const links = FOOTER_LINKS.map(
     (link) => `<span> ・ <a href="${escapeHtml(link.href)}" rel="noopener noreferrer">${escapeHtml(link.label)}</a></span>`,
   );
