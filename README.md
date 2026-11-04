@@ -118,4 +118,5 @@ main への push（と手動の実行）で `.github/workflows/pages.yml` がビ
 
 - コード：[MIT License](LICENSE)
 - 配信する `out/assets/marp-browser.js`：[marp-core](https://github.com/marp-team/marp-core) の browser script（MIT License）。ビルドが先頭に marp-core のライセンス文を付ける
+- 配信する `out/assets/goatcounter.js`：`vendor/goatcounter/count.js`。[GoatCounter](https://github.com/arp242/goatcounter) v2.7.0 の `public/count.js`（ISC License。GoatCounter の本体は EUPL だが、このファイルは ISC）を写したもの。先頭に出典とライセンス文を付けてあり、その下は手を加えていない
 - 記事の文章・図・画像：著作権は作者。無断での転載・複製・改変・再配布は不可、引用のみ可（[content/LICENSE.md](content/LICENSE.md)）。記事の中のコード片は MIT
