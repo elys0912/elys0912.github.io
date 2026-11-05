@@ -4,6 +4,10 @@
 // marp-core の出力は rehype-sanitize を通さない。信頼の根拠は「PR を通したリポジトリの content/ の内容」。
 // その代わり、生の HTML は html: false で全部エスケープし、helper script の埋め込みも止める。
 // 出力の CSS からは `@import` を除き、外部のファイルを読み込ませない（stripLeadingImports）。
+// ただし、記事は任意の CSS を書ける。style のディレクティブと、本文の <style>（html: false でも Marpit がテーマの CSS として取り込む）
+// のどちらも出力の CSS に入り、url() の外部の画像も残る（CSP の img-src が https: を許す側では読み込まれる）。
+// これも記事が PR を通したリポジトリの content/ の内容であることを前提にしている。外から記事を受け取る経路を作るときは、
+// 出力の CSS の url() を除くなどの対策を先に入れる。
 
 import { Marp } from "@marp-team/marp-core";
 
