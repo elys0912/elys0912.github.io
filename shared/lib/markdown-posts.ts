@@ -294,12 +294,12 @@ export function loadPostDirectory(
       continue;
     }
     const file = path.join(dir, name);
-    if (!name.endsWith(MARKDOWN_SUFFIX) || !statSync(file).isFile()) {
+    if (!name.endsWith(MARKDOWN_SUFFIX)) {
       warn(`[markdown-posts] ${label} を読みません: ${dirName}/ には .md のファイルだけを置く`);
       continue;
     }
     const slug = name.slice(0, -MARKDOWN_SUFFIX.length);
-    const result = validateSlug(slug) ?? parsePost(readFileSync(file), slug, options.work === true);
+    const result = validateSlug(slug) ?? readPost(file, slug, options.work === true);
     if (typeof result === "string") {
       warn(`[markdown-posts] ${label} をスキップしました: ${result}`);
     } else {
@@ -314,6 +314,22 @@ function validateSlug(slug: string): string | undefined {
   if (!SLUG.test(slug)) return "slug（ファイル名）は英小文字と数字を - でつないだ形にする（例: my-post-2.md）";
   if (slug.length > MAX_SLUG_LENGTH) return `slug（ファイル名）は ${MAX_SLUG_LENGTH} 文字まで`;
   return undefined;
+}
+
+/**
+ * 1 ファイルを読んで記事にする。ファイルでない（ディレクトリ）か、読めない（壊れたシンボリックリンク、権限が無いなど）ときは
+ * 例外を投げずに理由の文字列を返す（ほかの記事は読み続ける）
+ */
+function readPost(file: string, slug: string, work: boolean): PostContent | WorkPostContent | string {
+  let bytes: Uint8Array;
+  try {
+    if (!statSync(file).isFile()) return "ファイルでない（.md のファイルだけを置く）";
+    bytes = readFileSync(file);
+  } catch (error) {
+    return `ファイルを読めません（${error instanceof Error ? error.message : String(error)}）`;
+  }
+
+  return parsePost(bytes, slug, work);
 }
 
 /** 1 ファイル分を記事にする。work なら作品として読む（付帯情報を許す）。読めなければ理由の文字列を返す */
