@@ -11,6 +11,8 @@ import { SITE_URL } from "./site.ts";
 const IMAGE_LINK_PREFIX = `/${IMAGES_DIRECTORY_NAME}/`;
 
 const HTML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+// Unicode の符号位置の上限。これを超える数値参照は String.fromCodePoint が RangeError を投げるので、戻さずにそのまま残す
+const MAX_CODE_POINT = 0x10ffff;
 
 /**
  * out/ の HTML が読み込むサイト内のファイル（<img src>、/images/ で始まる href、style 属性・<style> の中の url(…)）が
@@ -142,7 +144,7 @@ function decodeHtmlEntities(value: string): string {
   return value.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (entity: string, body: string) => {
     if (body[0] === "#") {
       const code = body[1] === "x" || body[1] === "X" ? Number.parseInt(body.slice(2), 16) : Number.parseInt(body.slice(1), 10);
-      return String.fromCodePoint(code);
+      return code > MAX_CODE_POINT ? entity : String.fromCodePoint(code);
     }
     return HTML_ENTITIES[body.toLowerCase()] ?? entity;
   });
