@@ -23,10 +23,14 @@ export const POST_LIST_EMPTY_TEXT = "なんもない";
 /** ナビ・サイドバー・フッターに並べるリンク */
 export type SiteLink = { href: string; label: string };
 
-/** ヘッダーのナビの項目。href は末尾を / にしたサイト内のパス */
+/** portfolio のトップ（ヘッダーのナビ、サイドバーのプロフィール、フッターで使う） */
+const PORTFOLIO_URL = "https://elysdev.net/";
+
+/** ヘッダーのナビの項目。href は末尾を / にしたサイト内のパスか、portfolio の URL */
 export const NAV_ITEMS: readonly SiteLink[] = [
   { href: "/", label: POST_LIST_TITLE },
   { href: "/tags/", label: "タグ" },
+  { href: PORTFOLIO_URL, label: "ホームページへ" },
 ];
 
 /** サイドバーのプロフィールの一言 */
@@ -36,7 +40,7 @@ export const PROFILE_BIO = "自称エンジニア　好きなものはゲーム�
 export const PROFILE_ICON = { path: "/apple-icon.png", size: 56 };
 
 /** portfolio へのリンク（サイドバーのプロフィールとフッターで使う） */
-const PORTFOLIO_LINK: SiteLink = { href: "https://elysdev.net/", label: "ポートフォリオ" };
+const PORTFOLIO_LINK: SiteLink = { href: PORTFOLIO_URL, label: "ホームページ" };
 
 /** サイドバーのプロフィールの下に並べるリンク */
 export const PROFILE_LINKS: readonly SiteLink[] = [
