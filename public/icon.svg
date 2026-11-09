@@ -1,18 +1,54 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- 時計（12 の目盛り。零時の 12 時だけ長く太く）の中に狐 -->
-  <rect width="64" height="64" rx="14" fill="#0d1210"/>
-  <circle cx="32" cy="32" r="27" fill="none" stroke="#e5002b" stroke-width="3"/>
-  <line x1="32.00" y1="13.50" x2="32.00" y2="6.50" stroke="#e5002b" stroke-width="3.6"/>
-  <line x1="43.00" y1="12.95" x2="44.75" y2="9.92" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="51.05" y1="21.00" x2="54.08" y2="19.25" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="54.00" y1="32.00" x2="57.50" y2="32.00" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="51.05" y1="43.00" x2="54.08" y2="44.75" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="43.00" y1="51.05" x2="44.75" y2="54.08" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="32.00" y1="54.00" x2="32.00" y2="57.50" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="21.00" y1="51.05" x2="19.25" y2="54.08" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="12.95" y1="43.00" x2="9.92" y2="44.75" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="10.00" y1="32.00" x2="6.50" y2="32.00" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="12.95" y1="21.00" x2="9.92" y2="19.25" stroke="#e5002b" stroke-width="2.2"/>
-  <line x1="21.00" y1="12.95" x2="19.25" y2="9.92" stroke="#e5002b" stroke-width="2.2"/>
-  <path transform="translate(32 33) scale(0.85) translate(-32 -33)" d="M18 17 L27 26 L37 26 L46 17 L45 35 L32 50 L19 35 Z" fill="#e5002b"/>
+  <!-- 時計の中に狐。輪と目盛りは上が明るく下が暗い赤、狐は面に割って左上から光を当てる -->
+  <!-- 目盛りは 12・3・6・9 時が太く、零時の 12 時だけ長い -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.4" r="0.65">
+      <stop offset="0" stop-color="#1f2a25"/>
+      <stop offset="1" stop-color="#070a09"/>
+    </radialGradient>
+    <!-- 目盛りの棒（幅 0 の bbox）にも同じ色が乗るよう、座標で輪の上端 6〜下端 58 に合わせる -->
+    <linearGradient id="ring" gradientUnits="userSpaceOnUse" x1="0" y1="6" x2="0" y2="58">
+      <stop offset="0" stop-color="#ff4d6a"/>
+      <stop offset="0.5" stop-color="#e5002b"/>
+      <stop offset="1" stop-color="#9c0019"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="1.4" stdDeviation="1" flood-color="#000" flood-opacity="0.7"/>
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <g filter="url(#shadow)">
+    <circle cx="32" cy="32" r="26" fill="none" stroke="url(#ring)" stroke-width="5"/>
+    <!-- 左上の外側の光沢 -->
+    <path d="M9.06 48.06 A28 28 0 0 1 18.00 7.75" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="0.8" stroke-linecap="round"/>
+    <g stroke="url(#ring)" stroke-linecap="round">
+      <line x1="32.00" y1="9.90" x2="32.00" y2="14.70" stroke-width="3.4"/>
+      <line x1="43.50" y1="12.08" x2="42.60" y2="13.64" stroke-width="1.6"/>
+      <line x1="51.92" y1="20.50" x2="50.36" y2="21.40" stroke-width="1.6"/>
+      <line x1="54.60" y1="32.00" x2="52.40" y2="32.00" stroke-width="2.4"/>
+      <line x1="51.92" y1="43.50" x2="50.36" y2="42.60" stroke-width="1.6"/>
+      <line x1="43.50" y1="51.92" x2="42.60" y2="50.36" stroke-width="1.6"/>
+      <line x1="32.00" y1="54.60" x2="32.00" y2="52.40" stroke-width="2.4"/>
+      <line x1="20.50" y1="51.92" x2="21.40" y2="50.36" stroke-width="1.6"/>
+      <line x1="12.08" y1="43.50" x2="13.64" y2="42.60" stroke-width="1.6"/>
+      <line x1="9.40" y1="32.00" x2="11.60" y2="32.00" stroke-width="2.4"/>
+      <line x1="12.08" y1="20.50" x2="13.64" y2="21.40" stroke-width="1.6"/>
+      <line x1="20.50" y1="12.08" x2="21.40" y2="13.64" stroke-width="1.6"/>
+    </g>
+    <!-- 面と同じ色の線で縁取り、線の角を丸めて狐の角を落とす -->
+    <g transform="translate(32 33) scale(0.82) translate(-32 -33)" stroke-width="1.6" stroke-linejoin="round">
+      <polygon points="18.00,17.00 22.80,27.00 18.60,28.00" fill="#ff3355" stroke="#ff3355"/>
+      <polygon points="18.00,17.00 27.00,26.00 22.80,27.00" fill="#a8001c" stroke="#a8001c"/>
+      <polygon points="46.00,17.00 45.40,28.00 41.20,27.00" fill="#e5002b" stroke="#e5002b"/>
+      <polygon points="46.00,17.00 41.20,27.00 37.00,26.00" fill="#8a0016" stroke="#8a0016"/>
+      <polygon points="27.00,26.00 37.00,26.00 32.00,37.00" fill="#e5002b" stroke="#e5002b"/>
+      <polygon points="18.60,28.00 22.80,27.00 27.00,26.00 32.00,37.00 19.00,35.00" fill="#ff3355" stroke="#ff3355"/>
+      <polygon points="19.00,35.00 32.00,37.00 32.00,50.00" fill="#e5002b" stroke="#e5002b"/>
+      <polygon points="37.00,26.00 41.20,27.00 45.40,28.00 45.00,35.00 32.00,37.00" fill="#c4001f" stroke="#c4001f"/>
+      <polygon points="32.00,37.00 45.00,35.00 32.00,50.00" fill="#8a0016" stroke="#8a0016"/>
+      <!-- 耳の内毛 -->
+      <polygon points="21.20,21.50 25.40,25.90 23.00,25.90" fill="#fbf3ea" stroke="#fbf3ea" stroke-width="0.8"/>
+      <polygon points="42.80,21.50 38.60,25.90 41.00,25.90" fill="#fbf3ea" stroke="#fbf3ea" stroke-width="0.8"/>
+    </g>
+  </g>
 </svg>
