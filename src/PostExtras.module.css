@@ -1,0 +1,117 @@
+/*
+ * 記事ページの、ブログだけの部品。
+ * - 本文の後ろの「前の記事／次の記事」と「関連する記事」（src/html.ts）
+ * - 見出しのリンク（#）とコードのコピーボタン（src/client.js がブラウザで足す。class 名は css.ts が書き換えた後の名前で引く）
+ */
+
+/* 前後の記事。左が前（古い）、右が次（新しい）。片方しか無いときも位置を変えない */
+.neighbors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.neighbor {
+  display: block;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.neighbor:hover {
+  border-color: var(--yellow);
+}
+
+.next {
+  grid-column: 2;
+  text-align: right;
+}
+
+.label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .neighbors {
+    grid-template-columns: 1fr;
+  }
+
+  .next {
+    grid-column: auto;
+  }
+}
+
+.related {
+  margin-bottom: 32px;
+}
+
+.relatedHeading {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.relatedList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relatedList a {
+  color: var(--foreground);
+}
+
+.relatedList time {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* 見出しのリンク。見出しに乗せたときと、キーボードで選んだときだけ見せる */
+.anchor {
+  margin-left: 0.4em;
+  color: var(--muted);
+  text-decoration: none;
+  opacity: 0;
+}
+
+h2:hover > .anchor,
+.anchor:focus-visible {
+  opacity: 1;
+}
+
+/* 乗せる操作が無い端末（タッチ）では常に見せる */
+@media (hover: none) {
+  .anchor {
+    opacity: 1;
+  }
+}
+
+/* コードブロックを包む箱。コピーボタンを右上に固定する（pre の中に置くと、横スクロールで一緒に流れる） */
+.codeBlock {
+  position: relative;
+}
+
+.copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.copy:hover {
+  color: var(--foreground);
+}

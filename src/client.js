@@ -1,8 +1,52 @@
 // ブラウザで動かすスクリプト（ビルドが out/assets/site.js にコピーし、全ページで読む）。依存なし。
 // 記事の目次の現在地（aria-current="location"）：スクロールのたびに、画面の上から 30% の線より上にある最後の見出しにする。
 // ページの末尾まで来たら最後の見出しにする（短い記事では、後ろの見出しが線まで上がらないまま末尾に着くため）。
-// 目次のリンクをクリックしたときは、次に利用者がスクロールするまで、クリックした見出しにする
+// 目次のリンクをクリックしたときは、次に利用者がスクロールするまで、クリックした見出しにする。
+// 記事の本文には、見出し（h2）のリンクと、コードブロックのコピーボタンを足す。
+// class 名は、src/css.ts が書き換えた後の名前（ファイル名_class）をそのまま書く
 // @ts-check
+
+// 見出しのリンク。見出しの URL（#section-1 など）をコピーしやすくする。id が付くのは本文の h2 だけ
+(() => {
+  for (const heading of document.querySelectorAll(".PostDetail_body h2[id]")) {
+    const anchor = document.createElement("a");
+    anchor.className = "PostExtras_anchor";
+    anchor.href = `#${heading.id}`;
+    anchor.textContent = "#";
+    anchor.setAttribute("aria-label", `「${heading.textContent}」へのリンク`);
+    heading.append(anchor);
+  }
+})();
+
+// コードブロックのコピーボタン。https でないページ（手元の http のプレビューなど）では clipboard が無いので足さない
+(() => {
+  if (navigator.clipboard === undefined) return;
+
+  const COPY_LABEL = "コピー";
+  const COPIED_LABEL = "コピーした";
+  // コピーした後、ボタンの文字を元に戻すまでの時間
+  const COPIED_LABEL_MS = 2000;
+
+  for (const pre of document.querySelectorAll(".PostDetail_body pre")) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "PostExtras_copy";
+    button.textContent = COPY_LABEL;
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(pre.textContent ?? "");
+      button.textContent = COPIED_LABEL;
+      window.setTimeout(() => {
+        button.textContent = COPY_LABEL;
+      }, COPIED_LABEL_MS);
+    });
+
+    // ボタンを pre の外に置くため、pre を箱で包む
+    const codeBlock = document.createElement("div");
+    codeBlock.className = "PostExtras_codeBlock";
+    pre.replaceWith(codeBlock);
+    codeBlock.append(pre, button);
+  }
+})();
 
 (() => {
   // 目次の現在地。scroll のたびに見出しの位置から決める。

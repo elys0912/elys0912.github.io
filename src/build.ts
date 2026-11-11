@@ -85,7 +85,7 @@ function writeSite(posts: readonly PostContent[], now: Date): number {
   const ctx: PageContext = { assets, now };
 
   writePage(HOME_PATH, homePage(posts, ctx));
-  for (const post of posts) writePage(postPath(post.slug), postPage(post, ctx));
+  for (const post of posts) writePage(postPath(post.slug), postPage(post, posts, ctx));
   for (const archive of groupPostsByMonth(posts)) writePage(archivePath(archive.month), archivePage(archive, posts, ctx));
   writePage(TAG_INDEX_PATH, tagIndexPage(posts, ctx));
   writePage(PRIVACY_PATH, privacyPage(ctx));

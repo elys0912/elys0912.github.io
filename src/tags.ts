@@ -36,6 +36,20 @@ export function groupPostsByTag(posts: readonly PostContent[]): TagArchive[] {
     .sort((a, b) => b.posts.length - a.posts.length || compareCodeUnits(a.tag, b.tag));
 }
 
+/**
+ * post と同じタグを持つ記事。同じタグの多い順、同数なら posts の並びのまま。先頭から count 件まで。
+ * post 自身は含めない。タグが無い記事では空
+ */
+export function relatedPostsOf(post: PostContent, posts: readonly PostContent[], count: number): PostContent[] {
+  const tags = new Set(post.tags ?? []);
+  const sharedTagCount = (other: PostContent) => (other.tags ?? []).filter((tag) => tags.has(tag)).length;
+
+  return posts
+    .filter((other) => other !== post && sharedTagCount(other) > 0)
+    .sort((a, b) => sharedTagCount(b) - sharedTagCount(a))
+    .slice(0, count);
+}
+
 /** タグがすべて out/tags/<タグ>/ のディレクトリ名にできることを確かめる。できないタグがあれば例外を投げる */
 function assertTagsUsableAsDirectoryNames(tags: readonly string[]): void {
   const problems = tags.filter((tag) => UNSAFE_TAG.test(tag)).map((tag) => `ディレクトリ名にできないタグ: ${tag}`);

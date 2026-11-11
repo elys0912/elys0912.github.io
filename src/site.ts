@@ -51,6 +51,9 @@ export const PROFILE_LINKS: readonly SiteLink[] = [
 /** サイドバーの「最近の記事」に出す件数 */
 export const RECENT_POSTS_COUNT = 5;
 
+/** 記事の末尾の「関連する記事」に出す件数 */
+export const RELATED_POSTS_COUNT = 3;
+
 /** 月別の一覧ページの見出し（<title> にも使う）と説明。month は「2026-10」（yyyy-MM） */
 export function archiveTitle(month: string): string {
   return `${month} の記事`;
