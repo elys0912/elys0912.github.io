@@ -71,6 +71,8 @@ content/images/<slug>/<ファイル名>.webp   （.png、.jpg、.jpeg も可）
 
 Node.js 24 以上を使う（`.ts` のファイルを Node.js が直接実行するため）。
 
+ビルドは、記事ごとの OGP 画像（`out/og/<slug>.png`）をヘッドレスの Chrome で作るので、Chrome が要る。Windows は既定の場所（`C:\Program Files\Google\Chrome\Application\chrome.exe`）、Linux は PATH の `google-chrome` を使う。ほかの場所にあるときは、環境変数 `CHROME_PATH` に実行ファイルを指定する。Chrome が見つからないとビルドは失敗する。画像の文字は、ビルドする環境の書体で描く（GitHub Actions では、ワークフローが日本語の書体を入れてからビルドする）。記事 41 件で 30 秒ほどかかる。
+
 ```sh
 npm ci
 npm run typecheck    # tsc --noEmit
@@ -93,6 +95,7 @@ Windows では、`out/` を配信するサーバー（`npm run preview` など�
 - `src/html.ts`：ページの HTML（トップ、記事、タグ、月別、404、`<head>`、サイドバー）
 - `src/css.ts`：CSS を 1 本（`out/assets/site.css`）にまとめる。CSS Modules の class を「ファイル名_class」（例 `.PostList_title`）に書き換えて結合する
 - `src/feed.ts`：`feed.xml`（Atom 1.0）、`sitemap.xml`、`robots.txt`
+- `src/og.ts`：記事ごとの OGP 画像（`out/og/<slug>.png`、1200×630。記事のタイトルを入れた HTML を Chrome で撮る）
 - `src/site.ts`：サイトの URL、サイト名、説明、ナビ、フッターの設定（変えるときはここだけを直す）
 - `src/client.js`：ブラウザで動く小さなスクリプト（目次の現在地、見出しのリンク、コードのコピーボタン）
 - `src/*.module.css`：このブログだけの CSS（`src/css.ts` の `MODULE_FILES` に並べる）

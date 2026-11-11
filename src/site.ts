@@ -102,8 +102,13 @@ const GOATCOUNTER_CODE = "elys-blog";
 const GOATCOUNTER_ORIGIN = `https://${GOATCOUNTER_CODE}.goatcounter.com`;
 export const GOATCOUNTER_ENDPOINT = `${GOATCOUNTER_ORIGIN}/count`;
 
-/** サイト全体の OGP 画像（public/ に置く静的ファイル）。記事ごとの画像は無い */
+/** サイト全体の OGP 画像（public/ に置く静的ファイル）。記事のページは、記事ごとの画像（ogImagePath）を使う */
 export const OG_IMAGE = { path: "/opengraph-image.png", width: 1200, height: 630, alt: SITE_NAME };
+
+/** 記事ごとの OGP 画像のパス。ビルドが作る（src/og.ts）。大きさは OG_IMAGE と同じ */
+export function ogImagePath(slug: string): string {
+  return `/og/${slug}.png`;
+}
 
 /**
  * Content-Security-Policy。GitHub Pages は応答ヘッダーを付けられないため、全ページの <meta http-equiv> で出す。

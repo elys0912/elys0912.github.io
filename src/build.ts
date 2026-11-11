@@ -15,6 +15,7 @@
 //   assets/marp-browser.js   marp-core の browser script（Marp の記事だけが読む。先頭に marp-core の LICENSE を付ける）
 //   assets/goatcounter.js    vendor/goatcounter/count.js（アクセス解析。全ページが読む。先頭に出典と ISC License がある）
 //   images/<slug>/…          content/images/ のうち、公開した記事から参照されている画像
+//   og/<slug>.png            記事ごとの OGP 画像（src/og.ts。ヘッドレスの Chrome で作る）
 //   public/ の中身           favicon.ico、icon.svg、apple-icon.png、opengraph-image.png
 //
 // 書き出した後、ページが読み込むサイト内の画像（<img src>、/images/ で始まる href、style の url(…)）が out/ にあるかを確かめる
@@ -33,6 +34,7 @@ import { buildCss, missingClassNames } from "./css.ts";
 import { buildAtomFeed, buildRobots, buildSitemap } from "./feed.ts";
 import { archivePage, homePage, notFoundPage, postPage, privacyPage, tagIndexPage, tagPage, type PageContext } from "./html.ts";
 import { imageReferences } from "./images.ts";
+import { writeOgImages } from "./og.ts";
 import { CONTENT_DIRECTORY, IMAGES_DIRECTORY_NAME, loadPosts, POSTS_DIRECTORY_NAME } from "./posts.ts";
 import { archivePath, HOME_PATH, postPath, PRIVACY_PATH, SITE_URL, TAG_INDEX_PATH, tagPath } from "./site.ts";
 import { groupPostsByTag } from "./tags.ts";
@@ -50,7 +52,7 @@ const EXPECTED_MISSING_CLASSES: ReadonlySet<string> = new Set(["PostList.main"])
 /** 記事が 0 件でもビルドを通すときに "1" にする環境変数。記事の移動・削除の誤りで、空のサイトを公開しないため */
 const ALLOW_NO_POSTS_ENV = "BLOG_ALLOW_NO_POSTS";
 
-function main(): void {
+async function main(): Promise<void> {
   const now = new Date();
   const posts = loadPosts(contentDir, now);
   if (posts.length === 0 && process.env[ALLOW_NO_POSTS_ENV] !== "1") {
@@ -62,7 +64,7 @@ function main(): void {
   rmSync(outDir, { recursive: true, force: true });
   let images: number;
   try {
-    images = writeSite(posts, now);
+    images = await writeSite(posts, now);
   } catch (error) {
     // 書きかけの out/ を npm run preview などで配信しないよう消す
     rmSync(outDir, { recursive: true, force: true });
@@ -72,7 +74,7 @@ function main(): void {
 }
 
 /** out/ にサイトを書き出し、確かめる。コピーした画像の枚数を返す */
-function writeSite(posts: readonly PostContent[], now: Date): number {
+async function writeSite(posts: readonly PostContent[], now: Date): Promise<number> {
   mkdirSync(outDir, { recursive: true });
   cpSync(path.join(root, "public"), outDir, { recursive: true });
 
@@ -99,6 +101,7 @@ function writeSite(posts: readonly PostContent[], now: Date): number {
   writeFileSync(path.join(outDir, "robots.txt"), buildRobots());
 
   const images = copyImages(posts.map((post) => post.slug));
+  await writeOgImages(posts, outDir);
   checkSiteResources(outDir);
   checkMissingClasses();
 
@@ -192,4 +195,4 @@ function referencedImages(slugs: readonly string[]): Set<string> {
   return keys;
 }
 
-main();
+await main();

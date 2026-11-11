@@ -28,6 +28,7 @@ import {
   HOME_PATH,
   NAV_ITEMS,
   OG_IMAGE,
+  ogImagePath,
   POST_LIST_EMPTY_TEXT,
   POST_LIST_LEAD,
   POST_LIST_TITLE,
@@ -64,6 +65,8 @@ type HeadOptions = {
   /** ページのパス。og:url と canonical、ナビの現在地に使う。省略すると出さない（404） */
   path?: string;
   article?: { publishedTime: string; updatedTime: string };
+  /** OGP 画像。省略するとサイト全体の画像（OG_IMAGE）になる。大きさは OG_IMAGE と同じ */
+  image?: { path: string; alt: string };
   noindex?: boolean;
 };
 
@@ -179,8 +182,9 @@ export function postPage(post: PostContent, posts: readonly PostContent[], ctx: 
   const main = `<article${cls("Sidebar", "postLayout")}>${postHeader(post)}${column}<div${cls("PostDetail", "content")}>${body}${neighborPosts(post, posts)}${relatedPosts(post, posts)}${footer}</div></article>`;
 
   const article = { publishedTime: post.publishedAt, updatedTime: post.updatedAt };
+  const image = { path: ogImagePath(post.slug), alt: post.title };
 
-  return page(ctx, { title: post.title, description: post.summary, path: postPath(post.slug), article }, main);
+  return page(ctx, { title: post.title, description: post.summary, path: postPath(post.slug), article, image }, main);
 }
 
 /** 前の記事（1 つ古い）と次の記事（1 つ新しい）へのリンク。どちらも無ければ出さない */
@@ -378,13 +382,13 @@ function page({ assets, now }: PageContext, head: HeadOptions, main: string): st
   return `<!DOCTYPE html><html lang="ja"><head>${headTags(head, assets)}</head><body>${body}</body></html>\n`;
 }
 
-function headTags({ title, description, path, article, noindex }: HeadOptions, assets: Assets): string {
+function headTags({ title, description, path, article, image = OG_IMAGE, noindex }: HeadOptions, assets: Assets): string {
   // <title> と og:title はどちらも「タイトル | サイト名」。タイトルが無いページ（トップ）はサイト名だけ
   const fullTitle = title ? `${title} | ${SITE_NAME}` : SITE_NAME;
   // og:title は、ページのメタデータを持つページ（トップ、月別とタグの一覧、記事）だけがタイトル入り。404 はサイト名（Next.js 版と同じ）
   const ogTitle = path !== undefined ? fullTitle : SITE_NAME;
   const url = path !== undefined ? absoluteUrl(path) : undefined;
-  const image = absoluteUrl(OG_IMAGE.path);
+  const imageUrl = absoluteUrl(image.path);
   const imageWidth = String(OG_IMAGE.width);
   const imageHeight = String(OG_IMAGE.height);
 
@@ -403,18 +407,18 @@ function headTags({ title, description, path, article, noindex }: HeadOptions, a
     og("og:url", url),
     og("og:site_name", SITE_NAME),
     og("og:locale", "ja_JP"),
-    og("og:image", image),
+    og("og:image", imageUrl),
     og("og:image:width", imageWidth),
     og("og:image:height", imageHeight),
-    og("og:image:alt", OG_IMAGE.alt),
+    og("og:image:alt", image.alt),
     og("og:type", article ? "article" : "website"),
     og("article:published_time", article?.publishedTime),
     og("article:modified_time", modifiedTime(article)),
     meta({ name: "twitter:card", content: "summary_large_image" }),
     meta({ name: "twitter:title", content: ogTitle }),
     meta({ name: "twitter:description", content: description }),
-    meta({ name: "twitter:image", content: image }),
-    meta({ name: "twitter:image:alt", content: OG_IMAGE.alt }),
+    meta({ name: "twitter:image", content: imageUrl }),
+    meta({ name: "twitter:image:alt", content: image.alt }),
     meta({ name: "twitter:image:width", content: imageWidth }),
     meta({ name: "twitter:image:height", content: imageHeight }),
     link({ rel: "icon", href: "/favicon.ico", sizes: "48x48", type: "image/x-icon" }),
