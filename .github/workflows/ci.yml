@@ -24,4 +24,10 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       # draft: true の記事、publishedAt が未来の記事、読めない記事が content/blog/ にあれば失敗する
+      # 記事ごとの OGP 画像は、ビルドがヘッドレスの Chrome で作る（src/og.ts）。ランナーには日本語の書体が無いので入れる。
+      # 入っていないままビルドすると文字の無い画像になるので、書体が見つからなければ止める
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-list :lang=ja | grep -q .
       - run: npm run build
