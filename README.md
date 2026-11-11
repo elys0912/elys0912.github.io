@@ -94,10 +94,11 @@ Windows では、`out/` を配信するサーバー（`npm run preview` など�
 - `src/css.ts`：CSS を 1 本（`out/assets/site.css`）にまとめる。CSS Modules の class を「ファイル名_class」（例 `.PostList_title`）に書き換えて結合する
 - `src/feed.ts`：`feed.xml`（Atom 1.0）、`sitemap.xml`、`robots.txt`
 - `src/site.ts`：サイトの URL、サイト名、説明、ナビ、フッターの設定（変えるときはここだけを直す）
-- `src/client.js`：ブラウザで動く小さなスクリプト（目次の現在地）
+- `src/client.js`：ブラウザで動く小さなスクリプト（目次の現在地、見出しのリンク、コードのコピーボタン）
 - `src/*.module.css`：このブログだけの CSS（`src/css.ts` の `MODULE_FILES` に並べる）
   - `Sidebar.module.css`：一覧のページと記事ページの 2 列、サイドバー
   - `Tags.module.css`：タグのチップ
+  - `PostExtras.module.css`：記事の末尾の前後の記事と関連する記事、見出しのリンク、コードのコピーボタン
 
 記事ページの 2 列は、共有の PostDetail の 2 列（`.layout.withToc`）を使わず、`Sidebar.module.css` の `.postLayout`（出力の class は `Sidebar_postLayout`）で組んでいる。右の列にサイドバーと目次を縦に並べるため。共有側の 2 列の作り（領域の並び、列の間隔、900px 以下の並び）を変えてもブログには反映されないので、変えたら `Sidebar.module.css` を手で合わせる。
 

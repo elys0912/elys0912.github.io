@@ -1,7 +1,7 @@
 // ページの HTML。トップ（記事一覧）、月別の一覧、タグの一覧とタグごとの一覧、記事、プライバシーポリシー、404 と、共通の <head>、ヘッダー、フッター。
 // HTML の構造と class 名は portfolio（Next.js の React コンポーネント）が出すものにそろえる。
 // 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠、
-// タグのチップのリンク（src/Tags.module.css）。
+// タグのチップのリンク（src/Tags.module.css）、記事の末尾の前後の記事と関連する記事（src/PostExtras.module.css）。
 // class 名は css.ts が書き換えた名前を classOf で引く。CSS に無い class は、CSS Modules と同じく属性ごと出さない。
 // 意図して CSS に無いもの（build.ts の EXPECTED_MISSING_CLASSES）以外があれば、build.ts がビルドを止める。
 // 文字は escapeHtml を通す。本文の HTML は shared/lib/markdown.ts が許可リストでサニタイズ済み。
@@ -38,6 +38,7 @@ import {
   PROFILE_ICON,
   PROFILE_LINKS,
   RECENT_POSTS_COUNT,
+  RELATED_POSTS_COUNT,
   SITE_DESCRIPTION,
   SITE_NAME,
   TAG_INDEX_DESCRIPTION,
@@ -48,7 +49,7 @@ import {
   TAGS_TITLE,
   tagTitle,
 } from "./site.ts";
-import { groupPostsByTag, type TagArchive } from "./tags.ts";
+import { groupPostsByTag, relatedPostsOf, type TagArchive } from "./tags.ts";
 
 /** ページの <head> と本文の外側（CSS とスクリプトの URL）に使う、out/ の中のファイルの URL（?v= 付き） */
 type Assets = { css: string; script: string; marpScript: string; counterScript: string };
@@ -162,9 +163,10 @@ function tagChips(tags: readonly string[] | undefined): string {
 
 /**
  * 記事の詳細ページ。右の列はサイドバーと、その下の目次（無い記事では出さない）。
- * サイドバーはプロフィールだけにする（postSidebar）
+ * サイドバーはプロフィールだけにする（postSidebar）。
+ * 本文の後ろに、前後の記事と関連する記事を出す。posts は公開済みの全記事（新しい順）
  */
-export function postPage(post: PostContent, ctx: PageContext): string {
+export function postPage(post: PostContent, posts: readonly PostContent[], ctx: PageContext): string {
   const isMarp = isMarpMarkdown(post.bodyMarkdown);
   const { html, headings } = isMarp ? { html: "", headings: [] } : renderMarkdownWithHeadings(post.bodyMarkdown);
   const hasToc = headings.length > 0;
@@ -174,11 +176,44 @@ export function postPage(post: PostContent, ctx: PageContext): string {
   const body = isMarp ? marpDeck(post.bodyMarkdown, ctx.assets) : `<div${cls("PostDetail", "body")}>${html}</div>`;
   const backLabel = `${POST_LIST_TITLE}へ戻る`;
   const footer = `<footer${cls("PostDetail", "footer")}><p><a${cls("PostDetail", "back")} href="${HOME_PATH}">← ${escapeHtml(backLabel)}</a></p></footer>`;
-  const main = `<article${cls("Sidebar", "postLayout")}>${postHeader(post)}${column}<div${cls("PostDetail", "content")}>${body}${footer}</div></article>`;
+  const main = `<article${cls("Sidebar", "postLayout")}>${postHeader(post)}${column}<div${cls("PostDetail", "content")}>${body}${neighborPosts(post, posts)}${relatedPosts(post, posts)}${footer}</div></article>`;
 
   const article = { publishedTime: post.publishedAt, updatedTime: post.updatedAt };
 
   return page(ctx, { title: post.title, description: post.summary, path: postPath(post.slug), article }, main);
+}
+
+/** 前の記事（1 つ古い）と次の記事（1 つ新しい）へのリンク。どちらも無ければ出さない */
+function neighborPosts(post: PostContent, posts: readonly PostContent[]): string {
+  // posts は新しい順なので、1 つ後ろが前の記事、1 つ前が次の記事
+  const index = posts.indexOf(post);
+  const previous = neighborLink(posts[index + 1], "前の記事", "prev");
+  const next = neighborLink(posts[index - 1], "次の記事", "next");
+  if (previous === "" && next === "") return "";
+
+  return `<nav${cls("PostExtras", "neighbors")} aria-label="前後の記事">${previous}${next}</nav>`;
+}
+
+function neighborLink(post: PostContent | undefined, label: string, rel: "prev" | "next"): string {
+  if (post === undefined) return "";
+
+  const linkClass = rel === "next" ? classList(["PostExtras", "neighbor"], ["PostExtras", "next"]) : classOf("PostExtras", "neighbor");
+
+  return `<a${attr("class", linkClass)} rel="${rel}" href="${escapeHtml(postPath(post.slug))}"><span${cls("PostExtras", "label")}>${label}</span>${escapeHtml(post.title)}</a>`;
+}
+
+/** 同じタグを持つ記事の一覧。該当が無ければ出さない */
+function relatedPosts(post: PostContent, posts: readonly PostContent[]): string {
+  const related = relatedPostsOf(post, posts, RELATED_POSTS_COUNT);
+  if (related.length === 0) return "";
+
+  const items = related.map(
+    (other) =>
+      `<li><a href="${escapeHtml(postPath(other.slug))}">${escapeHtml(other.title)}</a><time datetime="${escapeHtml(other.publishedAt)}">${formatDate(other.publishedAt)}</time></li>`,
+  );
+  const heading = `<h2 id="related-heading"${cls("PostExtras", "relatedHeading")}>関連する記事</h2>`;
+
+  return `<section${cls("PostExtras", "related")} aria-labelledby="related-heading">${heading}<ul${cls("PostExtras", "relatedList")}>${items.join("")}</ul></section>`;
 }
 
 /** 記事の冒頭（パンくずリスト、公開日と更新日、タイトル、概要、タグ） */
