@@ -33,7 +33,9 @@
     button.className = "PostExtras_copy";
     button.textContent = COPY_LABEL;
     button.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(pre.textContent ?? "");
+      // コードブロックの文字は改行で終わる。貼り付けた先に空の行が増えないよう、最後の改行を落とす
+      await navigator.clipboard.writeText((pre.textContent ?? "").replace(/
+$/, ""));
       button.textContent = COPIED_LABEL;
       window.setTimeout(() => {
         button.textContent = COPY_LABEL;
