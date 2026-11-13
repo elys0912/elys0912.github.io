@@ -19,7 +19,7 @@ tags: [java, security]
 
 ## PKCS#7 は「ブロック長 k」で決めている
 
-PKCS#7 のパディングは、RFC 2315（PKCS #7 v1.5、1998 年）の 10.3 と、その後継の RFC 5652（CMS）の 6.3 にある。RFC 5652 の 6.3 から引用する。
+PKCS#7 のパディングは RFC 2315（PKCS #7 v1.5、1998 年）の 10.3 と、その後継の RFC 5652（CMS）の 6.3 にある。RFC 5652 の 6.3 から引用する。
 
 > For such algorithms, the input shall be padded at the trailing end with k-(lth mod k) octets all having value k-(lth mod k), where lth is the length of the input.
 
@@ -33,7 +33,7 @@ k の範囲には条件がある。
 
 ## PKCS#5 は「8 バイト」で決めている
 
-PKCS#5 は、パスワードから鍵を作って暗号化するための規格。いまの版は RFC 8018（PKCS #5 v2.1、2017 年）で、パディングは 6.1.1 の手順 4 にある。
+PKCS#5 はパスワードから鍵を作って暗号化するための規格。いまの版は RFC 8018（PKCS #5 v2.1、2017 年）で、パディングは 6.1.1 の手順 4 にある。
 
 > where the padding string PS consists of 8-(||M|| mod 8) octets each with value 8-(||M|| mod 8).
 
@@ -82,7 +82,7 @@ if (paddingScheme.equalsIgnoreCase("NoPadding")) {
 
 `blockSize` は暗号の側から渡される。`AESCipher` は `AESConstants.AES_BLOCK_SIZE`（16）、`DESedeCipher` は `DESConstants.DES_BLOCK_SIZE`（8）で `CipherCore` を作っている。
 
-`PKCS5Padding` クラスの中身は、PKCS#7 の式そのものだ。
+`PKCS5Padding` クラスの中身は PKCS#7 の式そのものだ。
 
 ```java
 public int padLength(int len) {
@@ -100,7 +100,7 @@ public void padWithLen(byte[] in, int off, int len) throws ShortBufferException 
 
 名前は PKCS#5 なのに、中身はブロック長 k で動く PKCS#7 になっている。
 
-JDK 8／11／17／21 の `setPadding` も GitHub の openjdk/jdk8u などで読んだが、通る名前は同じ 3 つで、PKCS7Padding はどの版にも無かった。
+JDK 8／11／17／21 の `setPadding` も GitHub の openjdk/jdk8u などで読んだが、通る名前は同じ 3 つで、PKCS7Padding はどのバージョンにも無かった。
 
 ## 動かして確かめる
 
@@ -222,7 +222,7 @@ OpenJDK にも、この名前の食い違いを扱ったチケット [JDK-807696
 - ANSI X9.23（`00 … 00 長さ`）や ISO 10126（`乱数 … 長さ`）を使っている
 - パディングを付けていない（OpenSSL の `-nopad`、割り切れるときに 1 ブロック足さない独自の実装）
 
-たいていは `BadPaddingException` になる。厄介なのは最後のケースで、パディングが無いのに平文の最後のバイトがたまたま `01` だと、例外にならずに 1 バイト削られる。気づかないままデータが壊れる。
+たいていは `BadPaddingException` になる。厄介なのは最後のケースで、パディングが無いのに平文の最後のバイトがたまたま `01` だと、例外にならずに 1 バイト削られる。気づかないままデータがおかしくなる。
 
 逆に、鍵・IV・モードが食い違っていても、復号結果がでたらめになって同じ `BadPaddingException` が出る。パディングを疑う前に、3DES の鍵の長さ（SunJCE の DESede は 24 バイト）、IV の受け渡し、文字コード、Base64 の扱いを確かめたほうが早い。
 

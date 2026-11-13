@@ -15,7 +15,7 @@ Mastodon の投稿欄用に書いたユーザースクリプトは、1 ファイ
 
 # アイコンは Google の Material Symbols
 
-ボタンのアイコンには、Mastodon 本体の UI と同じ Material Symbols を使った。見た目を本家に合わせたかったから。フォントを読み込むのではなく、7 つのアイコンの SVG パスデータをスクリプトに直接埋め込んでいる。
+ボタンのアイコンには Mastodon 本体の UI と同じ Material Symbols を使った。見た目を本家に合わせたかったから。フォントを読み込むのではなく、7 つのアイコンの SVG パスデータをスクリプトに直接埋め込んでいる。
 
 Material Symbols は Google LLC の成果物で、ライセンスは Apache License 2.0。スクリプト本体の MIT とは別のライセンスが混ざるので、そこは明記しないといけない。
 
@@ -27,7 +27,7 @@ Material Symbols は Google LLC の成果物で、ライセンスは Apache Lice
 - `LICENSES/Apache-2.0.txt` に Apache License 2.0 の全文を置く
 - スクリプト内のパスデータの直前に、著作権者とライセンス、上記 2 ファイルへの参照をコメントで書く
 
-`THIRD_PARTY_NOTICES.md` には、使ったアイコン名（`public`、`quiet`、`lock`、`at`、`group`、`quote`、`quoteOff`）と、パスデータを改変していないことを書いた。Apache License 2.0 は再配布時にライセンス全文の添付を求めるので、`LICENSES/` に全文を置いた。README のライセンス節からは、MIT と Material Symbols の両方に触れて `THIRD_PARTY_NOTICES.md` へ案内している。
+`THIRD_PARTY_NOTICES.md` には、使ったアイコン名（`public`、`quiet`、`lock`、`at`、`group`、`quote`、`quoteOff`）と、パスデータを改変していないことを書いた。Apache License 2.0 は再配布時にライセンス全文の添付を求めるので、`LICENSES/` に全文を置いた。README のライセンス節からは MIT と Material Symbols の両方に触れて `THIRD_PARTY_NOTICES.md` へ案内している。
 
 本体のライセンスと第三者の表記を分けたのは、読む人が迷わないため。`LICENSE` を開いた人は MIT だと分かればいいし、アイコンの話まで混ぜると長すぎる。第三者の分は専用のファイルにまとめ、全文は `LICENSES/` 以下に置く。この並べ方なら、将来別のライブラリを足すときも同じ形で増やせるはず。
 
@@ -37,4 +37,4 @@ Apache License 2.0 で何を添付すべきか、MIT と組み合わせたとき
 
 小さなスクリプトに 3 つもファイルが増えるのは大げさに見える。それでも、他人の成果物を含めている以上、どこから来た何なのかを書くのは最低限の礼儀なんだよな。
 
-次回は、既存の UI になじむ拡張の作り方について書く。
+次回は既存の UI になじむ拡張の作り方について書く。

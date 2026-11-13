@@ -30,7 +30,7 @@ SnapStart は INIT の後にスナップショットを取り、呼び出しの�
 
 # DSQL につなぐ
 
-接続は aurora-dsql-jdbc-connector で、IAM 認証。API の Lambda は admin ではなく `app` という専用ロールで接続し、IAM の権限も `dsql:DbConnect` だけに限定した。DSQL の接続は最長 60 分なので、プールの `max-lifetime` は 50 分にした。
+接続は aurora-dsql-jdbc-connector で、IAM 認証。API の Lambda は admin ではなく `app` という専用ロールで接続し、IAM の権限も `dsql:DbConnect` だけに限定した。DSQL の接続は最長 60 分なので、プールの `max-lifetime` は 50 分にしている。
 
 マイグレーションは API の Lambda ではやらない。SnapStart の INIT で admin 権限のない app ロールが DDL を試みてしまうから。同じ zip の別ハンドラをマイグレーション用の Lambda にして、`dsql:DbConnectAdmin` はこれだけに付けた。CDK の Trigger で、クラスタ → マイグレーション → API の Lambda の順に実行する。Flyway の後に、app ロールの作成と権限付与を冪等に行う。
 
@@ -57,4 +57,4 @@ PostgreSQL 互換とはいえ、DDL で引っかかる点がある。公式ド�
 
 フックの登録順や DSQL の制約は、AI の説明だけでは信用せず、ドキュメントと実際のデプロイで確かめた。GRANT も tomcat-embed-el も、AI と一緒に書いたコードが本番の Lambda で初めて壊れた。ローカルで通ることと Lambda で動くことは別。失敗の原因を追えるログを先に用意しておくのが、やはりいちばん効いた。
 
-次回は、GitHub Actions から OIDC で AWS にデプロイする話を書く予定。
+次回は GitHub Actions から OIDC で AWS にデプロイする話を書く予定。

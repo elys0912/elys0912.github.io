@@ -31,7 +31,7 @@ Browser ─ CloudFront ─┬─ /*      → S3（静的サイト、OAC）
 
 ## 落とし穴 1：errorResponses は全体にかかる
 
-- OAC 経由の S3 は、存在しないキーを 403 で返す
+- OAC 経由の S3 は存在しないキーを 403 で返す
 - そこで「403 → 404 ページ」を errorResponses に書いていた
 - ところが errorResponses はビヘイビアごとではなく、ディストリビューション全体に効く
 - `/api/*` の 403 まで 404 に化けて、将来の管理 API の認可エラーが見えなくなる
@@ -80,7 +80,7 @@ Browser ─ CloudFront ─┬─ /*      → S3（静的サイト、OAC）
 - `CloudFront-Viewer-Address` は、マネージドの「Host 以外を転送」のポリシーでは届かない
 - 閲覧者が自分で付けた同名のヘッダーは素通しで届く
 - viewer request の CloudFront Function で、独自のヘッダーを `event.viewer.ip` で必ず上書きする
-- 同名のヘッダーが複数あるときの `multiValue` も 1 つに潰す
+- 同名のヘッダーが複数あるときの `multiValue` も 1 つにする
 - origin-verify と組で初めて「CloudFront を経由し、CloudFront が決めた IP」だけを信用できる
 
 ---
@@ -109,7 +109,7 @@ Browser ─ CloudFront ─┬─ /*      → S3（静的サイト、OAC）
 - errorResponses の範囲は、最初の設定だと考慮から抜けていた
 - 直し方の選択肢（LIST を足す、403 を残す、TTL）は AI に並べさせたが、AI には決めさせない
 - 「execute-api を無効にすれば済む」案は、カスタムドメインがない前提だと成り立たないとちゃんと確認した
-- 乱数の全ゼロは、登録した値を読み戻すまで全く気づかなかった
+- 乱数の全ゼロは登録した値を読み戻すまで全く気づかなかった
 
 ---
 
@@ -118,4 +118,4 @@ Browser ─ CloudFront ─┬─ /*      → S3（静的サイト、OAC）
 - 1 つの CloudFront に静的サイトと API を同居させると、ディストリビューション全体の設定が API に効く
 - 「CloudFront を通ったこと」は、オリジン側で検証しないと保証されない
 - 失敗したときのログは、失敗する前に残るようにしておく
-- 次回は、個人開発での Dependabot の運用を書く予定
+- 次回は個人開発での Dependabot の運用を書く予定

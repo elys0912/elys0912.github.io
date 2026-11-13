@@ -15,7 +15,7 @@ tags: [spring-boot, frontend, testing, portfolio]
 
 # まず手で合わせる
 
-1 回目の修正は、backend に合わせて手で直した。
+1 回目の修正は backend に合わせて手で直した。
 
 - `Post` 型をやめ、backend の `PostSummary`（一覧）と `PostDetail`（詳細）に合わせて 2 つに分ける
 - 型ガードも一覧用と詳細用に分け、一覧に本文を要求しない
@@ -28,13 +28,13 @@ tags: [spring-boot, frontend, testing, portfolio]
 
 同じ PR で、もう 1 つ直したことがある。`output: "export"` では、動的ルートの `generateStaticParams` が 1 件以上返さないとビルドが失敗する。記事が 0 件の種別があると、それだけでビルドが落ちる。
 
-対処は、0 件のときだけ `__placeholder__` という slug を 1 件返し、そのページは `notFound()` で 404 にすること。一覧には出さない。0 件のときにしか使わないので、実在する記事との衝突もない。公開前のサイトは記事 0 本。この小技がないと、デプロイの練習すらできなかった。
+対処は 0 件のときだけ `__placeholder__` という slug を 1 件返し、そのページは `notFound()` で 404 にすること。一覧には出さない。0 件のときにしか使わないので、実在する記事との衝突もない。公開前のサイトは記事 0 本。この小技がないと、デプロイの練習すらできなかった。
 
 # 仕様をファイルに書き出す
 
 2 回目の修正は backend 側。springdoc-openapi を入れて、OpenAPI の仕様を `backend/openapi/openapi.json` としてリポジトリに置いた。
 
-要点は、仕様を手で書かないこと。コードから生成し、生成結果とコミット済みのファイルを比較するテストを置いた。`OpenApiSpecTests` が MockMvc で `/v3/api-docs` を取り、ファイルと比べる。ずれていればテストが失敗するので、CI の `./mvnw verify` で検出できる。API を変えたときは `-Dopenapi.update=true` を付けて同じテストを走らせると、ファイルが書き換わる。
+要点は仕様を手で書かないこと。コードから生成し、生成結果とコミット済みのファイルを比較するテストを置いた。`OpenApiSpecTests` が MockMvc で `/v3/api-docs` を取り、ファイルと比べる。ずれていればテストが失敗するので、CI の `./mvnw verify` で検出できる。API を変えたときは `-Dopenapi.update=true` を付けて同じテストを走らせると、ファイルが書き換わる。
 
 生成する仕様の中身も少し調整した。
 
@@ -56,7 +56,7 @@ export type PostSummary = Schemas["PostSummary"];
 export type PostDetail = Schemas["PostDetail"];
 ```
 
-CI では生成し直して `git diff --exit-code` で比べる。コミット済みの型が古ければ失敗する。`openapi.json` が変わったときも frontend の CI が走るよう、paths フィルタにこのファイルを足した。
+CI では生成し直して `git diff --exit-code` で比べる。コミット済みの型が古ければ失敗する。`openapi.json` が変わったときも frontend の CI が走るよう、paths フィルタにこのファイルを足してある。
 
 これで、backend の変更 → テストが `openapi.json` の更新を要求 → frontend の CI が型の再生成を要求、と連鎖する。どこかでずれが放置されることは、もうないはず。
 
@@ -66,4 +66,4 @@ CI では生成し直して `git diff --exit-code` で比べる。コミット�
 
 手で合わせて終わりにするか、仕様をファイルに書き出してテストで比べる形にするかは、AI には決めさせなかった。後から変えにくいことではないので、まず手で直して動かし、次の PR で仕組みにした。2 つのコードベースの間の契約は、人ではなくテストが覚えておくものなんだよな。
 
-次回は、Spring Boot を Lambda の SnapStart で動かし、Aurora DSQL につないだ話を書く予定。
+次回は Spring Boot を Lambda の SnapStart で動かし、Aurora DSQL につないだ話を書く予定。

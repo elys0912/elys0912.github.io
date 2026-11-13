@@ -31,7 +31,7 @@ tags: [frontend, security, portfolio]
 
 # アカウントとサイトを作る
 
-登録の画面は、アカウント名、サイトのドメイン、メールアドレス、パスワードだけ。アカウント名が、そのまま集計の画面の URL（`https://<名前>.goatcounter.com`）になる。
+登録の画面はアカウント名、サイトのドメイン、メールアドレス、パスワードだけ。アカウント名がそのまま集計の画面の URL（`https://<名前>.goatcounter.com`）になる。
 
 ![GoatCounter の登録画面。Account name、Site domain、Email address、Password と、人間かどうかを確かめる数字の欄、Sign up のボタンが並んでいる](/images/goatcounter-access-analytics/signup.png)
 
@@ -39,7 +39,7 @@ tags: [frontend, security, portfolio]
 
 ![GoatCounter の Settings → Sites の画面。Code の表に elys（current）と elys-blog の 2 行があり、その下に新しいコードの入力欄と Add new のボタンがある](/images/goatcounter-access-analytics/sites.png)
 
-新しいサイトは、作った時点の設定を写して始まる。なので、集める項目は先に決めておいたほうが楽かな。
+新しいサイトは作った時点の設定を写して始まる。なので、集める項目は先に決めておいたほうが楽かな。
 
 # 集める項目を絞る
 
@@ -65,7 +65,7 @@ GoatCounter は IP アドレスと User-Agent を保存しない。同じ人の�
 
 写すときに気をつけたのは 2 つ。
 
-- 版を固定する。CDN の `count.js` は開発中の最新で、`count.v4.js` は古い系統だった。リリースの v2.7.0 のタグにある `public/count.js` を使い、ファイル名にも版を入れている
+- バージョンを固定する。CDN の `count.js` は開発中の最新で、`count.v4.js` は古い系統だった。リリースの v2.7.0 のタグにある `public/count.js` を使い、ファイル名にもバージョンを入れている
 - ライセンスを付ける。GoatCounter の本体は EUPL だが、`count.js` だけは ISC License になっている。先頭に出典と ISC の全文を書き、その下は手を加えずに置いた
 
 CSP で足すのは送信先だけで済んだ。
@@ -115,7 +115,7 @@ export function GoatCounter() {
 - `count.js` がまだ読み込まれていなければ待ち、読み込みが終わったときに今のページを数える
 - 2 回目からは参照元を空にする。`document.referrer` は最初にサイトへ来たときの値のままなので、そのまま送るとサイト内の移動が全部外から来たことになる
 
-3 つ目は、作ってから気づくとかなり面倒なやつだね。
+3 つ目は作ってから気づくとかなり面倒なやつだね。
 
 座席表のページだけは Next.js の layout を通らない、独立した HTML になっている。こっちにはタグを直接入れた。共有用の URL が席の番号をクエリに持つので、`data-goatcounter-settings` でパスを 1 つに固定して、席ごとに別のページとして数えないようにしてある。
 
@@ -129,7 +129,7 @@ portfolio の /privacy/ には「アクセス解析ツールは使わない」�
 
 1 つだけ、Cookie や localStorage を使わないと書いてきた portfolio とぶつかる所があった。`count.js` は、作者が自分の閲覧を数えないための設定として、localStorage の `skipgc` を読む。書き込むのは URL に `#toggle-goatcounter` を付けて開いたときだけ。それでも使っているのは確かなので、例外として文面に足している。
 
-portfolio には、frontend のソース全体から保存領域の API を探すテストがある。`count.js` はそこから外して、別のテストで 2 つを確かめるようにした。中身が v2.7.0 のままであること（ハッシュで比べる）と、localStorage に触るのが `skipgc` だけであること。版を上げたときに、黙って中身が変わるのを止めるためだよ。
+portfolio には、frontend のソース全体から保存領域の API を探すテストがある。`count.js` はそこから外して、別のテストで 2 つを確かめるようにした。中身が v2.7.0 のままであること（ハッシュで比べる）と、localStorage に触るのが `skipgc` だけであること。バージョンを上げたときに、気づかないうちに中身が変わるのを止めるためだよ。
 
 # 本番で数字が出ない
 
