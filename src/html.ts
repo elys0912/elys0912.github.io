@@ -260,7 +260,7 @@ export function privacyPage(ctx: PageContext): string {
   const goatcounterPrivacy = `<a href="https://www.goatcounter.com/help/privacy" rel="noopener noreferrer">GoatCounter のプライバシーポリシー</a>`;
   const main = [
     `<h1>${escapeHtml(PRIVACY_TITLE)}</h1>`,
-    `<p>このサイトは、アクセス数を数えるために、アクセス解析のサービスの GoatCounter を使っている。閲覧者の情報を集めるのはこれだけで、コメントや問い合わせのフォームなど、入力してもらうものは無い。</p>`,
+    `<p>このサイトはアクセス数を数えるために、アクセス解析のサービスの GoatCounter を使っている。閲覧者の情報を集めるのはこれだけで、コメントや問い合わせのフォームなど、入力してもらうものは無い。</p>`,
     `<h2>送るもの</h2>`,
     `<p>ページを開くと、ブラウザから GoatCounter に次を送る。</p>`,
     `<ul><li>見たページのパスと、URL のクエリ（? から後ろ）</li><li>ページのタイトル</li><li>参照元（このページへのリンクがあったページの URL）</li><li>画面の幅</li><li>自動操作のブラウザかどうかの判定</li></ul>`,
