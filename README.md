@@ -71,7 +71,7 @@ content/images/<slug>/<ファイル名>.webp   （.png、.jpg、.jpeg も可）
 
 Node.js 24 以上を使う（`.ts` のファイルを Node.js が直接実行するため）。
 
-ビルドは、記事ごとの OGP 画像（`out/og/<slug>.png`）をヘッドレスの Chrome で作るので、Chrome が要る。Windows は既定の場所（`C:\Program Files\Google\Chrome\Application\chrome.exe`）、Linux は PATH の `google-chrome` を使う。ほかの場所にあるときは、環境変数 `CHROME_PATH` に実行ファイルを指定する。Chrome が見つからないとビルドは失敗する。画像の文字は、ビルドする環境の書体で描く（GitHub Actions では、ワークフローが日本語の書体を入れてからビルドする）。記事 41 件で 30 秒ほどかかる。
+ビルドは記事ごとの OGP 画像（`out/og/<slug>.png`）をヘッドレスの Chrome で作るので、Chrome が要る。Windows は既定の場所（`C:\Program Files\Google\Chrome\Application\chrome.exe`）、Linux は PATH の `google-chrome` を使う。ほかの場所にあるときは、環境変数 `CHROME_PATH` に実行ファイルを指定する。Chrome が見つからないとビルドは失敗する。画像の文字はビルドする環境の書体で描く（GitHub Actions では、ワークフローが日本語の書体を入れてからビルドする）。記事 41 件で 30 秒ほどかかる。
 
 ```sh
 npm ci
@@ -88,7 +88,7 @@ Windows では、`out/` を配信するサーバー（`npm run preview` など�
 
 - `content/`：記事（`blog/*.md`）と画像（`images/<slug>/`）
 - `public/`：そのまま `out/` にコピーするファイル（`favicon.ico`、`icon.svg`、`apple-icon.png`、`opengraph-image.png`）
-- `src/build.ts`：入口。記事を読み、ページ、フィード、CSS、画像を `out/` に書く
+- `src/build.ts`：エントリポイント。記事を読み、ページ、フィード、CSS、画像を `out/` に書く
 - `src/posts.ts`：記事の読み込みと検査
 - `src/images.ts`：記事の本文が参照する画像の拾い方
 - `src/tags.ts`、`src/archive.ts`：タグごと、月ごとの記事のまとめ
@@ -103,7 +103,7 @@ Windows では、`out/` を配信するサーバー（`npm run preview` など�
   - `Tags.module.css`：タグのチップ
   - `PostExtras.module.css`：記事の末尾の前後の記事と関連する記事、見出しのリンク、コードのコピーボタン
 
-記事ページの 2 列は、共有の PostDetail の 2 列（`.layout.withToc`）を使わず、`Sidebar.module.css` の `.postLayout`（出力の class は `Sidebar_postLayout`）で組んでいる。右の列にサイドバーと目次を縦に並べるため。共有側の 2 列の作り（領域の並び、列の間隔、900px 以下の並び）を変えてもブログには反映されないので、変えたら `Sidebar.module.css` を手で合わせる。
+記事ページの 2 列は共有の PostDetail の 2 列（`.layout.withToc`）を使わず、`Sidebar.module.css` の `.postLayout`（出力の class は `Sidebar_postLayout`）で組んでいる。右の列にサイドバーと目次を縦に並べるため。共有側の 2 列の作り（領域の並び、列の間隔、900px 以下の並び）を変えてもブログには反映されないので、変えたら `Sidebar.module.css` を手で合わせる。
 
 ### portfolio との共有（`shared/`）
 
