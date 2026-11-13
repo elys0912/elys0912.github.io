@@ -23,7 +23,7 @@ SnapStart は java25 のランタイムにも対応していたので、構成�
 
 ## 版は Groovy に合わせる
 
-依存は spock-core と spock-spring の 2.4-groovy-5.0。Spock は Groovy のメジャー版ごとに成果物が分かれるので、Spring Boot 4.1 が管理する Groovy 5.0 に合わせた。Groovy 本体の版は Boot の groovy-bom に任せ、上書きしない。Spring Boot 4.0 で Boot 側の Spock 連携がなくなったので、@SpringBean などの橋渡しは spock-spring を直接入れる。
+依存は spock-core と spock-spring の 2.4-groovy-5.0。Spock は Groovy のメジャー版ごとに成果物が分かれるので、Spring Boot 4.1 が管理する Groovy 5.0 に合わせた。Groovy 本体の版は Boot の groovy-bom に任せ、上書きしない。Spring Boot 4.0 で Boot 側の Spock 連携がなくなったので、@SpringBean などの橋渡しには spock-spring を直接入れる。
 
 ## ビルドと surefire の落とし穴
 
