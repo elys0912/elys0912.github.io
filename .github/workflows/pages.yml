@@ -50,3 +50,25 @@ jobs:
       - uses: actions/configure-pages@v6
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # 公開が成功した後に、portfolio の Rebuild site を起動する。トップページの「ブログの新着」を、公開したフィードで作り直すため（portfolio の ADR 0022）。
+  # needs: deploy なので、公開が終わる前には起動しない（古いフィードでビルドされるのを避ける）。
+  # トークンは portfolio の Actions の書き込みだけを持つ fine-grained PAT。ジョブにはリポジトリの権限を渡さない。
+  # secret が未設定なら起動せず成功で終える。新着は portfolio の週 1 回の定期のビルドで追いつく
+  rebuild-portfolio:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      PORTFOLIO_REPO: ${{ github.repository_owner }}/portfolio
+    steps:
+      - name: portfolio の Rebuild site を起動する
+        env:
+          GH_TOKEN: ${{ secrets.PORTFOLIO_REBUILD_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::secrets.PORTFOLIO_REBUILD_TOKEN が未設定。Rebuild site は起動しない"
+            exit 0
+          fi
+          gh workflow run rebuild.yml --repo "$PORTFOLIO_REPO" --ref main
