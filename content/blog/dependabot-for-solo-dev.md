@@ -7,7 +7,7 @@ tags: [ci-cd, portfolio]
 
 # はじめに
 
-このサイトのリポジトリは backend（Maven）、frontend（npm）、infra（npm）、GitHub Actions の 4 つの依存関係を持つ。Dependabot を全部に入れている。個人開発なので、PR を見るのは自分 1 人。放っておくと PR が溜まるので、運用を決めた。
+ポートフォリオのサイトのリポジトリは backend（Maven）、frontend（npm）、infra（npm）、GitHub Actions の 4 つの依存関係を持つ。Dependabot を全部に入れている。個人開発なので、PR を見るのは自分 1 人。放っておくと PR が溜まるので、運用を決めた。
 
 作業は AI（Claude Code）と壁打ちしながら進めている。どの PR を先に入れるかは、こっちで決める。
 
