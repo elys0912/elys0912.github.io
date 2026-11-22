@@ -7,7 +7,7 @@ tags: [aws, ci-cd, portfolio]
 
 # はじめに
 
-このサイトの API は Spring Boot を Lambda の SnapStart で動かしている（構成は[別の記事](/posts/spring-boot-snapstart-aurora-dsql/)に書いた）。2026-10-14 のレビューで、backend を触っていない Deploy でも、毎回 Lambda のコードが更新されていることが分かった。
+ポートフォリオのサイトの API は Spring Boot を Lambda の SnapStart で動かしている（構成は[別の記事](/posts/spring-boot-snapstart-aurora-dsql/)に書いた）。2026-10-14 のレビューで、backend を触っていない Deploy でも、毎回 Lambda のコードが更新されていることが分かった。
 
 直したのは pom の 1 行と、Deploy のワークフローの 1 行。原因が分かってしまえば小さい話だが、ずっと「変わっていないはず」と思い込んでいたところなので書いておく。レビューは AI（Claude）の 2 つのモデルに別々にやらせ、直すかどうかと直し方はこっちで決めた。
 
