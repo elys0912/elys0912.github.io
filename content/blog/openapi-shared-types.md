@@ -7,11 +7,11 @@ tags: [spring-boot, frontend, testing, portfolio]
 
 # はじめに
 
-このサイトの backend は Spring Boot、frontend は Next.js の静的 export。frontend はビルド時に API から記事を取り、静的なページにする。
+ポートフォリオのサイトの backend は Spring Boot、frontend は Next.js の静的 export。frontend はビルド時に API から記事を取り、静的なページにする。
 
 最初、frontend の型は手書きだった。AI（Claude Code）と壁打ちしながら骨組みを作った段階では、backend の API がまだなかったので、こうなるだろうという形で書いていた。実際の API につないだら、ビルドが型ガードで止まった。
 
-ずれていたのは 2 点。手書きの型は記事に `id` があると思っていたが、backend は slug しか返さない。一覧の要素に本文（`bodyMarkdown`）があると思っていたが、backend の一覧は本文を含まない。
+ずれていたのは 2 点。手書きの型では記事に `id` がある前提だったが、backend は slug しか返さない。一覧の要素に本文（`bodyMarkdown`）がある前提だったが、backend の一覧は本文を含まない。
 
 # まず手で合わせる
 
@@ -22,7 +22,7 @@ tags: [spring-boot, frontend, testing, portfolio]
 - 一覧の React の `key` を `id` から `slug` に変える
 - モックは詳細 API の形で持ち、一覧では `PostSummary` の形に絞る。日時は API と同じ UTC で書く
 
-これで動くようにはなった。ただ、手で合わせただけだと、次に backend が変わったときにまた気づけないんだよな。
+これで動くようにはなった。ただ、手で合わせただけだと、次に backend が変わったときにまた気づけない。
 
 ## 記事が 0 件でもビルドを通す
 

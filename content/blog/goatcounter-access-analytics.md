@@ -111,7 +111,7 @@ export function GoatCounter() {
 
 `createPageCounter` で気にしたのは 3 つ。
 
-- 同じパスは続けて数えない。React の effect と `count.js` の読み込みの完了は、どちらが先に来るか決まってない
+- 同じパスは続けて数えない。React の effect と `count.js` の読み込みの完了は、どちらが先に来るか決まっていない
 - `count.js` がまだ読み込まれていなければ待ち、読み込みが終わったときに今のページを数える
 - 2 回目からは参照元を空にする。`document.referrer` は最初にサイトへ来たときの値のままなので、そのまま送るとサイト内の移動が全部外から来たことになる
 

@@ -1,13 +1,13 @@
 ---
 title: "記事を Git で管理して、デプロイのたびに DB に upsert する"
-summary: ブログの記事はリポジトリの content/ を正本にして、デプロイのたびにマイグレーション用の Lambda が DB に upsert する。content を API の zip に入れない理由、Lambda Layer 案と S3 アセット案の比較、消した記事を DELETE せず非公開にする理由を書く。
+summary: ブログの記事はリポジトリの content/ を元データにして、デプロイのたびにマイグレーション用の Lambda が DB に upsert する。content を API の zip に入れない理由、Lambda Layer 案と S3 アセット案の比較、消した記事を DELETE せず非公開にする理由を書く。
 publishedAt: 2026-10-08T09:00:00+09:00
 tags: [aws, portfolio, design, ci-cd]
 ---
 
 # はじめに
 
-devlog #1 で、記事は Git リポジトリを正本にして、デプロイのたびに DB へ upsert すると書いた。管理画面は作らない。記事は PR を通して入る。この記事もそう。
+devlog #1 で、記事は Git リポジトリを元データにして、デプロイのたびに DB へ upsert すると書いた。管理画面は作らない。記事は PR を通して入る。この記事もそう。
 
 仕組みは 3 本の PR に分けて作った。読み込みと検証、DB への反映、Lambda への渡し方。AI（Claude Code）と壁打ちしながら進めたが、渡し方の方式を決めたのはこっち。
 
