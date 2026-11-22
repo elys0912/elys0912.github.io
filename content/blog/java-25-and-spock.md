@@ -7,7 +7,7 @@ tags: [spring-boot, testing, portfolio]
 
 # はじめに
 
-このサイトの backend は Spring Boot 4.1.1 を AWS Lambda（SnapStart）で動かし、Aurora DSQL につないでいる。2026-10-08 に PR を 2 本入れた。Java 21 → 25 と、テストを JUnit から Spock に替える話。前者は短く、後者は長い。
+ポートフォリオのサイトの backend は Spring Boot 4.1.1 を AWS Lambda（SnapStart）で動かし、Aurora DSQL につないでいる。2026-10-08 に PR を 2 本入れた。Java 21 → 25 と、テストを JUnit から Spock に替える話。前者は短く、後者は長い。
 
 # Java 25 は 12 行
 
