@@ -7,7 +7,7 @@ tags: [spring-boot, aws, portfolio]
 
 # 構成
 
-このサイトの API は、CloudFront → API Gateway HTTP API → Lambda（Java 21、arm64、SnapStart）→ Aurora DSQL という経路で動いている。常時課金されるものは作らない。作業は AI（Claude Code）と壁打ちしながら進めたが、方式の選択はこっちで決め、失敗の原因もこっちで確かめた。
+ポートフォリオのサイトの API は、CloudFront → API Gateway HTTP API → Lambda（Java 21、arm64、SnapStart）→ Aurora DSQL という経路で動いている。常時課金されるものは作らない。作業は AI（Claude Code）と壁打ちしながら進めたが、方式はこっちで決め、失敗の原因もこっちで確かめた。
 
 # ハンドラと zip
 
@@ -55,6 +55,6 @@ PostgreSQL 互換とはいえ、DDL で引っかかる点がある。公式ド�
 
 # AI との付き合い方
 
-フックの登録順や DSQL の制約は、AI の説明だけでは信用せず、ドキュメントと実際のデプロイで確かめた。GRANT も tomcat-embed-el も、AI と一緒に書いたコードが本番の Lambda で初めて壊れた。ローカルで通ることと Lambda で動くことは別。失敗の原因を追えるログを先に用意しておくのが、やはりいちばん効いた。
+フックの登録順や DSQL の制約は、AI の説明だけでは信用せず、ドキュメントと実際のデプロイで確かめた。GRANT も tomcat-embed-el も、AI と一緒に書いたコードが本番の Lambda で初めて壊れた。ローカルで通ることと Lambda で動くことは別。失敗の原因を追えるログを先に用意しておくのが、やはりいちばん役に立った。
 
 次回は GitHub Actions から OIDC で AWS にデプロイする話を書く予定。
