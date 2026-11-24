@@ -82,12 +82,12 @@ const MAX_TAG_LENGTH = MAX_TECH_LENGTH;
 /** タグに使えない文字。空白（全角を含む）、, と /。g フラグを付けない（test が lastIndex を持ち越さないため） */
 const TAG_FORBIDDEN = /[\s,/]/u;
 const MAX_REPOSITORY_URL_LENGTH = 500;
-/** repository の形。https で、ホスト名（ドットを含む）の後に、空白を含まない ASCII のパスを置ける（ContentLoader と同じ） */
+/** repository の形。https で、ホスト名（ドットを含む）の後に、空白を含まない ASCII のパスを置ける */
 const REPOSITORY_URL = /^https:\/\/[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:\/[!-~]*)?$/;
 
 const DELIMITER = "---";
 const MARKDOWN_SUFFIX = ".md";
-/** slug の形と長さの上限。URL の一部になる。API の取り込み側（ContentLoader の SLUG、MAX_SLUG_LENGTH）と同じ */
+/** slug の形と長さの上限。URL の一部になる */
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const MAX_SLUG_LENGTH = 200;
 
@@ -237,7 +237,7 @@ function parseFlowSequence(value: string): string[] | { reason: string } {
   const match = FLOW_SEQUENCE.exec(value);
   if (!match) return { reason: "[…] を読めません（1 行で閉じる。括弧を入れ子にしない。後ろにはコメントだけを置ける）" };
   const inner = match[1];
-  // 空白は YAML と同じく、スペースとタブだけを数える（ContentLoader と判定をそろえる）
+  // 空白は YAML と同じく、スペースとタブだけを数える
   if (/^[ \t]*$/.test(inner)) return { reason: "リストが空です（書かないならキーごと消す）" };
   const items: string[] = [];
   for (const raw of inner.split(",")) {
@@ -523,7 +523,7 @@ function findStringListProblem(items: string[], { key, maxItems, maxLength, item
 }
 
 /**
- * 作品の付帯情報を読む（ContentLoader の readWorkMeta と同じ規則）。問題は errors に足す。
+ * 作品の付帯情報を読む。問題は errors に足す。
  * - badge：WORK_BADGES のどれか。oss ならリポジトリが要る
  * - tech：1 行のリスト。1〜MAX_TECH_ITEMS 個、1 個 MAX_TECH_LENGTH 文字まで、同じ語は 1 回だけ
  * - repository：REPOSITORY_URL の形で MAX_REPOSITORY_URL_LENGTH 文字まで
