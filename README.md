@@ -88,17 +88,16 @@ Windows では、`out/` を配信するサーバー（`npm run preview` など�
 
 - `content/`：記事（`blog/*.md`）と画像（`images/<slug>/`）
 - `public/`：そのまま `out/` にコピーするファイル（`favicon.ico`、`icon.svg`、`apple-icon.png`、`opengraph-image.png`）
-- `src/build.ts`：エントリポイント。記事を読み、ページ、フィード、CSS、画像を `out/` に書く
+- `src/build.ts`：エントリポイント。記事を読み、ページ、フィード、CSS、画像を `out/` に書く。結合する CSS の一覧（`CSS_FILES`）も持つ。結合は `shared/lib/css.ts` が行い、CSS Modules の class を「ファイル名_class」（例 `.PostList_title`）に書き換える
 - `src/posts.ts`：記事の読み込みと検査
 - `src/images.ts`：記事の本文が参照する画像の拾い方
 - `src/tags.ts`、`src/archive.ts`：タグごと、月ごとの記事のまとめ
 - `src/html.ts`：ページの HTML（トップ、記事、タグ、月別、404、`<head>`、サイドバー）
-- `src/css.ts`：CSS を 1 本（`out/assets/site.css`）にまとめる。CSS Modules の class を「ファイル名_class」（例 `.PostList_title`）に書き換えて結合する
 - `src/feed.ts`：`feed.xml`（Atom 1.0）、`sitemap.xml`、`robots.txt`
 - `src/og.ts`：記事ごとの OGP 画像（`out/og/<slug>.png`、1200×630。記事のタイトルを入れた HTML を Chrome で撮る）
 - `src/site.ts`：サイトの URL、サイト名、説明、ナビ、フッターの設定（変えるときはここだけを直す）
 - `src/client.js`：ブラウザで動く小さなスクリプト（目次の現在地、見出しのリンク、コードのコピーボタン）
-- `src/*.module.css`：このブログだけの CSS（`src/css.ts` の `MODULE_FILES` に並べる）
+- `src/*.module.css`：このブログだけの CSS（`src/build.ts` の `CSS_FILES` に並べる）
   - `Sidebar.module.css`：一覧のページと記事ページの 2 列、サイドバー
   - `Tags.module.css`：タグのチップ
   - `PostExtras.module.css`：記事の末尾の前後の記事と関連する記事、見出しのリンク、コードのコピーボタン
@@ -107,12 +106,26 @@ Windows では、`out/` を配信するサーバー（`npm run preview` など�
 
 ### portfolio との共有（`shared/`）
 
-見た目を portfolio（別のリポジトリ）と揃えるため、CSS と Markdown・Marp の変換処理を portfolio から受け取っている。
+見た目を portfolio（別のリポジトリ）と揃えるため、CSS、Markdown・Marp の変換処理、HTML の部品を portfolio から受け取っている。
 
-- `shared/` の下に、portfolio の `frontend/` と同じ相対パスで置く（例 `shared/lib/markdown.ts`、`shared/components/PostList.module.css`）
+- `shared/` の下に、portfolio の `frontend/` と同じ相対パスで置く（例 `shared/lib/markdown.ts`、`shared/components/PostList.module.css`）。20 本の内訳は、CSS 8 本、`lib/` 7 本（`css.ts`・`html.ts`・`format.ts`・`markdown-posts.ts`・`markdown.ts`・`marp.ts`・`post-types.ts`）、`parts/` 5 本（`site-header.ts`・`table-of-contents.ts`・`marp-deck.ts`・`post-header.ts`・`post-list-heading.ts`）
 - 並んでいるファイルは `shared-with-blog.txt`（portfolio の `frontend/` からの相対パス）。同期で上書きされるので、このリポジトリでは直さない。直すときは portfolio 側で直して同期する
-- HTML の構造と class 名は、portfolio の React コンポーネントが出すものに合わせて `src/html.ts` に書いている。portfolio のコンポーネントの構造を変えたら、`src/html.ts` も合わせる
-- `src/html.ts` が引く class が CSS に無いと、`npm run build` が失敗する（CSS Modules と同じく class 属性ごと消え、見た目だけが崩れるため）。同期で共有の CSS の class 名が変わったら `src/html.ts` を合わせる。意図して CSS に無い class（`PostList.main`）は `src/build.ts` の `EXPECTED_MISSING_CLASSES` に並べる
+- 共有の部品は、サイトで違う値（ナビの項目と現在地、パンくずの先頭、一覧の単位、要約の後ろに足す HTML、Marp の browser script の URL）を引数で受ける。`src/html.ts` が `src/site.ts` の値を渡して呼ぶ
+- 共有しない HTML は `src/html.ts` に書く：一覧のカード、フッター、`<head>`、ページの骨格、サイドバー、タグ、前後の記事、関連記事。ブラウザで動くコード（目次の追従）は `src/client.js`
+- 共有の CSS の一覧は `src/build.ts` の `CSS_FILES`。共有の CSS のキー（`layout`・`SiteHeader` など）は portfolio の `frontend/lib/site-css.ts` と同じにする。`src/client.js` が書き換え後の class 名（`PostDetail_body` など）を直書きしているため
+- `src/html.ts` が引く class が CSS に無いと、`npm run build` が失敗する（CSS Modules と同じく class 属性ごと消え、見た目だけが崩れるため）。同期で共有の CSS の class 名が変わったら `src/html.ts` と `src/client.js` を合わせる。意図して CSS に無い class（`PostList.main`）は `src/build.ts` の `EXPECTED_MISSING_CLASSES` に並べる
+
+#### 共有の関数の引数が変わったとき
+
+引数の変更、一覧からの削除、ファイル名の変更を含む同期の PR は、`src/` が古い呼び方のままだと CI（typecheck）が落ちる。`shared/` は直さず、次の順で進める。
+
+1. portfolio の PR を出す前に、このリポジトリの手元の `shared/` へ変更後のファイルを写し、`src/` を新しい呼び方に直して、`npm run typecheck`・`npm run build` を流し、`out/` を変更前と比べる。`src/` の追従のコミットを用意する（手元の `shared/` の写しはコミットしない）
+2. portfolio の PR のマージで同期の PR ができる。最初の CI は落ちてよい（省略できる引数を足すだけなら落ちない）
+3. 同期の PR のブランチに、追従のコミットを cherry-pick で積んでからマージする。main が進んで衝突したら手で直す
+
+- 同期の PR をマージするまでは、portfolio の main に共有のファイルを変える変更を入れず、`workflow_dispatch` も動かさない。2 本目の PR ができる（追従が無く CI が落ちる）。できたら 2 本目を閉じ、1 本目に追従を積んでマージする
+- 同期の PR を閉じた後の再実行は、同期のブランチを強制で上書きする。閉じる前に追従のコミットを控える
+- CI は typecheck と build だけなので、共有の部品の変更で HTML が変わっても分からない。`out/` の比較は手で行う
 
 ## デプロイ
 
