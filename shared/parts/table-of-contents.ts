@@ -1,4 +1,4 @@
-// 記事の目次。項目は本文の h2。初期表示では最初の見出しを現在地にする（現在地の追従は client/toc.ts）。
+// 記事の目次。項目は本文の h2。初期表示では最初の見出しを現在地にする（現在地の追従は、各サイトのブラウザ側のスクリプト）。
 
 import { cls } from "../lib/css.ts";
 import { escapeHtml } from "../lib/html.ts";
