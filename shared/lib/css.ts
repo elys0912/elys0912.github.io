@@ -1,4 +1,4 @@
-// サイトの CSS を 1 本にまとめる。ブログと共有する（結合する CSS の一覧は、サイトごとに引数で渡す）。
+// サイトの CSS を 1 本にまとめる。portfolio とブログで共有する（結合する CSS の一覧は、サイトごとに引数で渡す）。
 // CSS は CSS Modules の形式のまま置く。ビルド時に class 名を「名前_class」（例：PostList.module.css の .title → .PostList_title）に
 // 書き換えてから結合する。HTML 側は classOf（と cls・classList）で同じ名前を引く。globals.css は書き換えずに先頭に置く。
 //
@@ -49,7 +49,7 @@ const UNSUPPORTED = /@keyframes|\bcomposes\s*:|:local\b|:global(?!\()/;
 /** 名前ごとの、書き換え前の class 名 → 書き換え後の class 名 */
 const classMap = new Map<string, Map<string, string>>();
 
-/** classOf で引いて CSS に無かった "名前.class"。build.ts が、1 つでもあればビルドを止めるのに使う */
+/** classOf で引いて CSS に無かった "名前.class"。各サイトのビルドが、CSS に無い class を見つけてビルドを止めるのに使う */
 const missingClasses = new Set<string>();
 
 /**
@@ -66,13 +66,21 @@ export function buildCss(root: string, { globalFile, moduleFiles }: CssFiles): s
   return parts.join("\n");
 }
 
+/** module の対応表。buildCss の前に引いたときと、渡した一覧に無い名前を引いたときは例外を投げる */
+function classesOf(module: string): Map<string, string> {
+  const classes = classMap.get(module);
+  if (classes !== undefined) return classes;
+
+  if (classMap.size === 0) throw new Error(`buildCss を呼ぶ前に、${module} の class 名を引いています`);
+  throw new Error(`${module} は、buildCss に渡した CSS の一覧にありません（名前の書き間違いか、一覧への足し忘れ）`);
+}
+
 /**
  * CSS Modules と同じく、CSS に無い class 名は undefined（class 属性を出さない）。
  * 無かったものは missingClassNames で返す。buildCss を呼んだ後に使う
  */
 export function classOf(module: string, name: string): string | undefined {
-  const classes = classMap.get(module);
-  if (classes === undefined) throw new Error(`${module} の CSS を読む前に class 名を引いています`);
+  const classes = classesOf(module);
 
   const scoped = classes.get(name);
   if (scoped === undefined) missingClasses.add(`${module}.${name}`);
@@ -90,8 +98,7 @@ export function missingClassNames(): string[] {
  * names のうち CSS に無いものがあれば例外を投げる（ブラウザ側では、CSS に無い class を検出できないため）
  */
 export function pickClasses<Name extends string>(module: string, names: readonly Name[]): Record<Name, string> {
-  const classes = classMap.get(module);
-  if (classes === undefined) throw new Error(`${module} の CSS を読む前に class 名を引いています`);
+  const classes = classesOf(module);
 
   const missing = names.filter((name) => classes.get(name) === undefined);
   if (missing.length > 0) throw new Error(`${module} の CSS に無い class があります: ${missing.join("、")}`);
