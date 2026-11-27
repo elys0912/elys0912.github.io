@@ -27,10 +27,10 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writ
 import { createRequire } from "node:module";
 import path from "node:path";
 
+import { buildCss, missingClassNames, type CssFiles } from "../shared/lib/css.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
 import { groupPostsByMonth } from "./archive.ts";
 import { checkSiteResources } from "./check-resources.ts";
-import { buildCss, missingClassNames } from "./css.ts";
 import { buildAtomFeed, buildRobots, buildSitemap } from "./feed.ts";
 import { archivePage, homePage, notFoundPage, postPage, privacyPage, tagIndexPage, tagPage, type PageContext } from "./html.ts";
 import { imageReferences } from "./images.ts";
@@ -42,6 +42,27 @@ import { groupPostsByTag } from "./tags.ts";
 const root = path.resolve(import.meta.dirname, "..");
 const outDir = path.join(root, "out");
 const contentDir = path.join(root, CONTENT_DIRECTORY);
+
+/**
+ * 結合する CSS（パスはリポジトリのルートからの相対）。moduleFiles は、CSS Modules のファイル名
+ * （.module.css を除いたもの。classOf の第 1 引数）→ ファイル。
+ * shared/ の 7 本の名前は portfolio と同じにする。src/client.js が、書き換え後の class 名を直書きしているため
+ */
+const CSS_FILES: CssFiles = {
+  globalFile: "shared/app/globals.css",
+  moduleFiles: {
+    layout: "shared/app/layout.module.css",
+    SiteHeader: "shared/components/SiteHeader.module.css",
+    SiteFooter: "shared/components/SiteFooter.module.css",
+    PostList: "shared/components/PostList.module.css",
+    PostDetail: "shared/components/PostDetail.module.css",
+    TableOfContents: "shared/components/TableOfContents.module.css",
+    MarpDeck: "shared/components/MarpDeck.module.css",
+    Sidebar: "src/Sidebar.module.css",
+    Tags: "src/Tags.module.css",
+    PostExtras: "src/PostExtras.module.css",
+  },
+};
 
 /**
  * src/html.ts が引くが、意図して CSS に無い class（"ファイル名.class"）。
@@ -79,7 +100,7 @@ async function writeSite(posts: readonly PostContent[], now: Date): Promise<numb
   cpSync(path.join(root, "public"), outDir, { recursive: true });
 
   const assets = {
-    css: writeAsset("site.css", buildCss(root)),
+    css: writeAsset("site.css", buildCss(root, CSS_FILES)),
     script: writeAsset("site.js", readFileSync(path.join(root, "src", "client.js"), "utf8")),
     marpScript: writeAsset("marp-browser.js", marpBrowserScript()),
     counterScript: writeAsset("goatcounter.js", readFileSync(path.join(root, "vendor", "goatcounter", "count.js"), "utf8")),

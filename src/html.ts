@@ -8,12 +8,18 @@
 // Marp の HTML は shared/lib/marp.ts が html: false（生の HTML はエスケープ）で変換済み。この 2 つはそのまま埋め込む。
 // ただし Marp は html: false でも、記事の <style> をスライドの CSS に、HTML のコメントをディレクティブとして読む。
 
+import { classList, classOf, cls } from "../shared/lib/css.ts";
 import { formatDate, formatYear } from "../shared/lib/format.ts";
-import { renderMarkdownWithHeadings, type Heading } from "../shared/lib/markdown.ts";
-import { isMarpMarkdown, renderMarp } from "../shared/lib/marp.ts";
+import { attr, attrList, escapeHtml } from "../shared/lib/html.ts";
+import { renderMarkdownWithHeadings } from "../shared/lib/markdown.ts";
+import { isMarpMarkdown } from "../shared/lib/marp.ts";
 import type { PostContent } from "../shared/lib/post-types.ts";
+import { marpDeck } from "../shared/parts/marp-deck.ts";
+import { postHeader } from "../shared/parts/post-header.ts";
+import { postListHeading, postListLead } from "../shared/parts/post-list-heading.ts";
+import { siteHeader } from "../shared/parts/site-header.ts";
+import { tableOfContents } from "../shared/parts/table-of-contents.ts";
 import { groupPostsByMonth, type MonthArchive } from "./archive.ts";
-import { classOf, type ModuleName } from "./css.ts";
 import { isUpdatedAfterPublished } from "./posts.ts";
 import {
   absoluteUrl,
@@ -122,14 +128,7 @@ type ListPageBody = { heading: string; lead: string; list: string };
 /** 一覧のページ（トップ、月別、タグの一覧、タグごと）。見出し・説明文・一覧を、右にサイドバーを置いた 2 列で包む */
 function listPage(ctx: PageContext, head: HeadOptions, { heading, lead, list }: ListPageBody, posts: readonly PostContent[]): string {
   // 説明文は見出しと一覧のあいだの余白も兼ねる（PostList の .lead の margin）
-  const leadHtml = `<p${cls("PostList", "lead")}>${escapeHtml(lead)}</p>`;
-
-  return page(ctx, head, withSidebar(`${heading}${leadHtml}${list}`, posts));
-}
-
-/** 記事一覧の見出しと件数。unit は件数の単位 */
-function postListHeading(title: string, count: number, unit = "件"): string {
-  return `<div${cls("PostList", "heading")}><h1>${escapeHtml(title)}</h1><p${cls("PostList", "count")}>${count} ${unit}</p></div>`;
+  return page(ctx, head, withSidebar(`${heading}${postListLead(lead)}${list}`, posts));
 }
 
 /** 記事一覧。記事が無いときは POST_LIST_EMPTY_TEXT */
@@ -176,10 +175,10 @@ export function postPage(post: PostContent, posts: readonly PostContent[], ctx: 
 
   const aside = hasToc ? `<aside${cls("PostDetail", "aside")}>${tableOfContents(headings)}</aside>` : "";
   const column = `<div${cls("Sidebar", "column")}>${postSidebar()}${aside}</div>`;
-  const body = isMarp ? marpDeck(post.bodyMarkdown, ctx.assets) : `<div${cls("PostDetail", "body")}>${html}</div>`;
+  const body = isMarp ? marpDeck(post.bodyMarkdown, ctx.assets.marpScript) : `<div${cls("PostDetail", "body")}>${html}</div>`;
   const backLabel = `${POST_LIST_TITLE}へ戻る`;
   const footer = `<footer${cls("PostDetail", "footer")}><p><a${cls("PostDetail", "back")} href="${HOME_PATH}">← ${escapeHtml(backLabel)}</a></p></footer>`;
-  const main = `<article${cls("Sidebar", "postLayout")}>${postHeader(post)}${column}<div${cls("PostDetail", "content")}>${body}${neighborPosts(post, posts)}${relatedPosts(post, posts)}${footer}</div></article>`;
+  const main = `<article${cls("Sidebar", "postLayout")}>${postHeader(post, { href: HOME_PATH, label: POST_LIST_TITLE }, tagChips(post.tags))}${column}<div${cls("PostDetail", "content")}>${body}${neighborPosts(post, posts)}${relatedPosts(post, posts)}${footer}</div></article>`;
 
   const article = { publishedTime: post.publishedAt, updatedTime: post.updatedAt };
   const image = { path: ogImagePath(post.slug), alt: post.title };
@@ -220,26 +219,6 @@ function relatedPosts(post: PostContent, posts: readonly PostContent[]): string 
   return `<section${cls("PostExtras", "related")} aria-labelledby="related-heading">${heading}<ul${cls("PostExtras", "relatedList")}>${items.join("")}</ul></section>`;
 }
 
-/** 記事の冒頭（パンくずリスト、公開日と更新日、タイトル、概要、タグ） */
-function postHeader(post: PostContent): string {
-  const breadcrumb = `<nav aria-label="パンくずリスト"><ol${cls("PostDetail", "breadcrumb")}><li><a href="${HOME_PATH}">${escapeHtml(POST_LIST_TITLE)}</a></li><li aria-current="page">${escapeHtml(post.title)}</li></ol></nav>`;
-  const title = `<h1${cls("PostDetail", "title")}>${escapeHtml(post.title)}</h1>`;
-  const summary = `<p${cls("PostDetail", "summary")}>${escapeHtml(post.summary)}</p>`;
-
-  return `<header${cls("PostDetail", "header")}>${breadcrumb}${postDates(post)}${title}${summary}${tagChips(post.tags)}</header>`;
-}
-
-function postDates(post: PostContent): string {
-  const publishedDate = formatDate(post.publishedAt);
-  const updatedDate = formatDate(post.updatedAt);
-  const published = `<span>公開日 <time datetime="${escapeHtml(post.publishedAt)}">${publishedDate}</time></span>`;
-  // 日本時間で公開日と違う日に更新したときだけ出す。公開後の更新に限る
-  const isUpdateShown = updatedDate !== publishedDate && isUpdatedAfterPublished(post.publishedAt, post.updatedAt);
-  const updated = isUpdateShown ? `<span>更新日 <time datetime="${escapeHtml(post.updatedAt)}">${updatedDate}</time></span>` : "";
-
-  return `<p${cls("PostDetail", "dates")}>${published}${updated}</p>`;
-}
-
 /** 404（GitHub Pages は 404.html を返す） */
 export function notFoundPage(ctx: PageContext): string {
   const message = `<h1>ページが見つかりません</h1><p>お探しのページは移動または削除された可能性があります。</p>`;
@@ -275,18 +254,6 @@ export function privacyPage(ctx: PageContext): string {
   ].join("");
 
   return page(ctx, { title: PRIVACY_TITLE, description: "このサイトが集める情報と、アクセス解析（GoatCounter）に送るもの", path: PRIVACY_PATH }, main);
-}
-
-/** 目次。項目は本文の h2。初期表示では最初の見出しを現在地にする（現在地の追従は src/client.js） */
-function tableOfContents(headings: readonly Heading[]): string {
-  const items = headings.map((heading, index) => {
-    const current = index === 0 ? ` aria-current="location"` : "";
-
-    return `<li><a href="#${escapeHtml(heading.id)}"${current}>${escapeHtml(heading.text)}</a></li>`;
-  });
-  const heading = `<p id="toc-heading"${cls("TableOfContents", "heading")}>目次</p>`;
-
-  return `<nav${cls("TableOfContents", "toc")} aria-labelledby="toc-heading">${heading}<ol${cls("TableOfContents", "list")}>${items.join("")}</ol></nav>`;
 }
 
 /**
@@ -363,21 +330,13 @@ function monthsSection(posts: readonly PostContent[]): string {
   return sidebarSection("月別", `<ul${cls("Sidebar", "months")}>${items.join("")}</ul>`);
 }
 
-/** Marp のスライド。テーマの CSS は div.marpit の下にスコープされている。文字の自動縮小などは marp-core の browser script が当てる */
-function marpDeck(markdown: string, assets: Assets): string {
-  const { html, css } = renderMarp(markdown);
-  if (/<\/style/i.test(css)) throw new Error("Marp の CSS に </style が含まれています");
-
-  return `<div${cls("MarpDeck", "deck")}><style>${css}</style><div>${html}</div></div><script src="${assets.marpScript}" defer></script>`;
-}
-
 /**
  * ページ全体。head.path はナビの現在地（aria-current）の判定にも使う。
  * どのページも GoatCounter の count.js を読み、開いたときに 1 回数える（送るものは /privacy/ に書いた）
  */
 function page({ assets, now }: PageContext, head: HeadOptions, main: string): string {
   const counter = `<script data-goatcounter="${escapeHtml(GOATCOUNTER_ENDPOINT)}" src="${assets.counterScript}" async></script>`;
-  const body = `${siteHeader(head.path)}<main${cls("layout", "main")}>${main}</main>${siteFooter(now)}<script src="${assets.script}" defer></script>${counter}`;
+  const body = `${siteHeader(NAV_ITEMS, head.path)}<main${cls("layout", "main")}>${main}</main>${siteFooter(now)}<script src="${assets.script}" defer></script>${counter}`;
 
   return `<!DOCTYPE html><html lang="ja"><head>${headTags(head, assets)}</head><body>${body}</body></html>\n`;
 }
@@ -447,28 +406,6 @@ function og(property: string, content: string | undefined): string {
   return content === undefined ? "" : meta({ property, content });
 }
 
-/** ヘッダー */
-function siteHeader(currentPath: string | undefined): string {
-  const current = currentNavHref(currentPath);
-  const items = NAV_ITEMS.map((item) => {
-    const ariaCurrent = item.href === current ? ` aria-current="page"` : "";
-
-    return `<li><a${ariaCurrent} href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a></li>`;
-  });
-  const nav = `<nav aria-label="メインメニュー"><ul${cls("SiteHeader", "nav")}>${items.join("")}</ul></nav>`;
-
-  return `<header${cls("SiteHeader", "header")}><div${cls("SiteHeader", "band")} aria-hidden="true"></div><div${cls("SiteHeader", "inner")}>${nav}</div></header>`;
-}
-
-/** ナビの現在地の href。いちばん長く一致する項目（/ はトップだけ） */
-function currentNavHref(currentPath: string | undefined): string | undefined {
-  if (currentPath === undefined) return undefined;
-
-  return NAV_ITEMS.map((item) => item.href)
-    .filter((href) => (href === "/" ? currentPath === "/" : currentPath.startsWith(href)))
-    .sort((a, b) => b.length - a.length)[0];
-}
-
 /**
  * フッター。著作権の表示の年は日本時間で数える。ビルド環境（CI は UTC）の時差の影響を避けるため。
  */
@@ -480,40 +417,3 @@ function siteFooter(now: Date): string {
 
   return `<footer${cls("SiteFooter", "footer")}><p${cls("SiteFooter", "inner")}>© ${year} ${escapeHtml(AUTHOR_NAME)}${links.join("")}</p></footer>`;
 }
-
-/** 複数の class をまとめた class 属性の値（CSS に無い class は外す。1 つも無ければ undefined） */
-function classList(...names: readonly [ModuleName, string][]): string | undefined {
-  const classes = names.map(([module, name]) => classOf(module, name)).filter((name) => name !== undefined);
-
-  return classes.length === 0 ? undefined : classes.join(" ");
-}
-
-/** class 属性（CSS に無い class なら出さない） */
-function cls(module: ModuleName, name: string): string {
-  return attr("class", classOf(module, name));
-}
-
-/** 属性を並べる。値は escapeHtml を通す */
-function attrList(attrs: Record<string, string>): string {
-  return Object.entries(attrs)
-    .map(([name, value]) => attr(name, value))
-    .join("");
-}
-
-/** 属性。値が undefined なら出さない */
-function attr(name: string, value: string | undefined): string {
-  return value === undefined ? "" : ` ${name}="${escapeHtml(value)}"`;
-}
-
-/** テキストと属性値のエスケープ（React と同じ 5 文字） */
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => htmlEntities[char]);
-}
-
-const htmlEntities: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#x27;",
-};
