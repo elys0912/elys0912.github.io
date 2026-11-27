@@ -6,8 +6,15 @@ components/PostList.module.css
 components/SiteFooter.module.css
 components/SiteHeader.module.css
 components/TableOfContents.module.css
+lib/css.ts
 lib/format.ts
+lib/html.ts
 lib/markdown-posts.ts
 lib/markdown.ts
 lib/marp.ts
 lib/post-types.ts
+parts/marp-deck.ts
+parts/post-header.ts
+parts/post-list-heading.ts
+parts/site-header.ts
+parts/table-of-contents.ts
