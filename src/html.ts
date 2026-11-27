@@ -1,8 +1,9 @@
 // ページの HTML。トップ（記事一覧）、月別の一覧、タグの一覧とタグごとの一覧、記事、プライバシーポリシー、404 と、共通の <head>、ヘッダー、フッター。
-// HTML の構造と class 名は portfolio（Next.js の React コンポーネント）が出すものにそろえる。
+// ヘッダー、目次、Marp、詳細の見出しと日付、一覧の見出しは、portfolio と共有する部品（shared/parts/）を、このサイトの値を渡して呼ぶ。
+// 一覧のカード、フッター、<head>、ページの骨格は、portfolio の部品が出す構造と class 名にそろえて、ここに書く。
 // 例外はサイドバー（ブログだけの部品。CSS は src/Sidebar.module.css）と、それを置くための 2 列の枠、
 // タグのチップのリンク（src/Tags.module.css）、記事の末尾の前後の記事と関連する記事（src/PostExtras.module.css）。
-// class 名は css.ts が書き換えた名前を classOf で引く。CSS に無い class は、CSS Modules と同じく属性ごと出さない。
+// class 名は shared/lib/css.ts が書き換えた名前を classOf で引く。CSS に無い class は、CSS Modules と同じく属性ごと出さない。
 // 意図して CSS に無いもの（build.ts の EXPECTED_MISSING_CLASSES）以外があれば、build.ts がビルドを止める。
 // 文字は escapeHtml を通す。本文の HTML は shared/lib/markdown.ts が許可リストでサニタイズ済み。
 // Marp の HTML は shared/lib/marp.ts が html: false（生の HTML はエスケープ）で変換済み。この 2 つはそのまま埋め込む。

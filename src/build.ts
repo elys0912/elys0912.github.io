@@ -10,7 +10,7 @@
 //   privacy/index.html       プライバシーポリシー
 //   404.html、404/index.html ページが見つからないとき（GitHub Pages は 404.html を返す）
 //   feed.xml、sitemap.xml、robots.txt
-//   assets/site.css          shared/ と src/ の CSS を 1 本にしたもの（src/css.ts）
+//   assets/site.css          shared/ と src/ の CSS を 1 本にしたもの（shared/lib/css.ts が結合する）
 //   assets/site.js           src/client.js
 //   assets/marp-browser.js   marp-core の browser script（Marp の記事だけが読む。先頭に marp-core の LICENSE を付ける）
 //   assets/goatcounter.js    vendor/goatcounter/count.js（アクセス解析。全ページが読む。先頭に出典と ISC License がある）
